@@ -16,6 +16,8 @@ OBJ=$(filter-out $(FILTER_OUT),$(OBJ_s))
 	@$(TARGET_CC) -o $@ -c $<  $(CFLAGS)
 all:$(OBJ)
 	@$(TARGET_CC) -o $(TARGET) $(OBJ) $(CFLAGS) $(LDFLAGS)
+	@$(INSTALL_DIR) $(TOP_DIR)/build/bin
+	@$(CP) $(TARGET) $(TOP_DIR)/build/bin
 	@$(call MESSAGE,"Finished!", $(TARGET))
 clean:
 	@rm -rf *.o $(TARGET) $(TOP_DIR)/build

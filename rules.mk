@@ -21,7 +21,10 @@ TARGET_CC:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)gcc)
 TARGET_AR:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)ar)
 TARGET_RANLIB:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)ranlib)
 TARGET_CXX:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)g++)
-
+CC:=$(TARGET_CC)
+AR:=$(TARGET_AR)
+RANLIB:=$(TARGET_RANLIB)
+CXX:=$(TARGET_CXX)
 
 CP:=cp -fpR
 LN:=ln -sf

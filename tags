@@ -1,0 +1,39 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+BUILD_DIR	libevent/Makefile	/^BUILD_DIR=$(TOP_DIR)\/build\/$/;"	m
+CFLAGS	rules.mk	/^CFLAGS = -I$(TOP_DIR)\/build\/include$/;"	m
+CP	rules.mk	/^CP:=cp -fpR$/;"	m
+EVENT_DIR	libevent/Makefile	/^EVENT_DIR=$(TOP_DIR)\/libevent\/$(TARGET)$/;"	m
+FILTER_OUT	z_my_work/Makefile	/^FILTER_OUT = $/;"	m
+INSTALL_BIN	rules.mk	/^INSTALL_BIN:=install -m0755$/;"	m
+INSTALL_CONF	rules.mk	/^INSTALL_CONF:=install -m0600$/;"	m
+INSTALL_DATA	rules.mk	/^INSTALL_DATA:=install -m0644$/;"	m
+INSTALL_DIR	rules.mk	/^INSTALL_DIR:=install -d -m0755$/;"	m
+LDFLAGS	rules.mk	/^LDFLAGS = -L$(TOP_DIR)\/build\/lib$/;"	m
+LN	rules.mk	/^LN:=ln -sf$/;"	m
+MESSAGE	rules.mk	/^MESSAGE = echo "$(TERM_BOLD)>>> $(1) $(2) $(TERM_RESET)"$/;"	m
+OBJ	z_my_work/Makefile	/^OBJ=$(filter-out $(FILTER_OUT),$(OBJ_s))$/;"	m
+OBJ_s	z_my_work/Makefile	/^OBJ_s = $(patsubst %.c,%.o,$(wildcard .\/*.c))$/;"	m
+TAR	rules.mk	/^TAR:=tar$/;"	m
+TARGET	libevent/Makefile	/^TARGET=libevent-2.1.8-stable$/;"	m
+TARGET	z_my_work/Makefile	/^TARGET = event$/;"	m
+TARGET_AR	rules.mk	/^TARGET_AR:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)ar)$/;"	m
+TARGET_CC	rules.mk	/^TARGET_CC:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)gcc)$/;"	m
+TARGET_CROSS_COMPILE	rules.mk	/^TARGET_CROSS_COMPILE:=-$/;"	m
+TARGET_CXX	rules.mk	/^TARGET_CXX:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)g++)$/;"	m
+TARGET_HOST	rules.mk	/^TARGET_HOST:=$(patsubst %-,%,$(TARGET_CROSS_COMPILE))$/;"	m
+TARGET_RANLIB	rules.mk	/^TARGET_RANLIB:=$(patsubst -%,%,$(TARGET_CROSS_COMPILE)ranlib)$/;"	m
+TERM_BOLD	rules.mk	/^TERM_BOLD := $(shell tput smso 2>\/dev\/null)$/;"	m
+TERM_RESET	rules.mk	/^TERM_RESET := $(shell tput rmso 2>\/dev\/null)$/;"	m
+TOP_DIR	libevent/Makefile	/^TOP_DIR:=${_TOPDIR}$/;"	m
+TOP_DIR	z_my_work/Makefile	/^TOP_DIR:=${_TOPDIR}$/;"	m
+XARGS	rules.mk	/^XARGS:=xargs -r$/;"	m
+_1_sec	z_my_work/main.c	/^struct timeval _1_sec={.tv_sec=1,.tv_usec=0};$/;"	v	typeref:struct:timeval
+_TOPDIR	libevent/Makefile	/^_TOPDIR:=$(word 1, $(subst \/libevent, ,$(shell pwd)))$/;"	m
+_TOPDIR	z_my_work/Makefile	/^_TOPDIR:=$(word 1, $(subst \/z_my_work, ,$(shell pwd)))$/;"	m
+main	z_my_work/main.c	/^int main()$/;"	f
+time_func	z_my_work/main.c	/^void time_func(evutil_socket_t fd, short flags, void *arg)$/;"	f

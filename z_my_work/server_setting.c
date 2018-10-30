@@ -245,4 +245,3 @@ int adjust_max_fd(int max_conns)
         }
     }
 }
-

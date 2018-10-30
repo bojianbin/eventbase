@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 #include <string.h>
+
+#include "anet.h"
 #include "server_setting.h"
 #include "threads.h"
 #include "event2/event.h"
@@ -310,6 +312,48 @@ static void conn_close(conn_t *c)
     return;
 }
 
+static int last_thread = -1;
+/*
+ * Dispatches a new connection to another thread. This is only ever called
+ * from the main thread, either during initialization (for UDP) or because
+ * of an incoming connection.
+ */
+void dispatch_conn_new(int sfd, enum conn_states init_state, int event_flags,
+                       int read_buffer_size, enum network_transport transport) {
+
+	conn_queue_item_t *item = cqi_new();
+    char buf[1];
+	
+    if (item == NULL) 
+	{
+        close(sfd);
+        /* given that malloc failed this may also fail, but let's try */
+        fprintf(stderr, "Failed to allocate memory for connection object\n");
+        return ;
+    }
+
+    int tid = (last_thread + 1) % g_setting.num_work_threads;
+
+    EVENT_THREAD *thread = threads + tid;
+
+    last_thread = tid;
+
+    item->sfd = sfd;
+    item->init_state = init_state;
+    item->event_flags = event_flags;
+    item->read_buffer_size = read_buffer_size;
+    item->transport = transport;
+
+    cq_push(thread->new_conn_queue, item);
+
+    buf[0] = 'c';
+    if (write(thread->notify_send_fd, buf, 1) != 1) 
+	{
+        perror("Writing to thread notify pipe");
+    }
+}
+
+
 void drive_machine(conn_t *c)
 {
 	int stop = 0;
@@ -541,4 +585,29 @@ void eventbase_thread_init(int nthreads, void *arg)
 	return;
 }
 
+#define UDP_READ_BUFFER_SIZE 65536
+
+int server_socket_init(int port)
+{
+	int tcp_fd = -1, udp_fd = -1;
+	int listen_conn_add;
+
+	if(port < 0) return -1;
+	tcp_fd = anetTcpServer(NULL, port, NULL , 100);
+	if(tcp_fd < 0) 
+		return -1;
+
+	udp_fd = anetUdpServer(NULL, port, NULL);
+	
+	dispatch_conn_new(udp_fd, conn_read,
+                                  EV_READ | EV_PERSIST,
+                                  UDP_READ_BUFFER_SIZE, udp_transport);
+	
+	listen_conn_add = conn_new(tcp_fd, conn_listening,
+                                             EV_READ | EV_PERSIST, 1,
+                                             tcp_transport, main_base);
+
+	return 0;
+	
+}
 

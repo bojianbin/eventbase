@@ -127,4 +127,8 @@ typedef struct conn_s
     EVENT_THREAD *thread; /* Pointer to the thread object serving this connection */
 }conn_t;
 
+
+
+int server_socket_init(int port);
+
 #endif

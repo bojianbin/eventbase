@@ -695,22 +695,20 @@ int anetFormatSock(int fd, char *fmt, size_t fmt_len) {
     return anetFormatAddr(fmt, fmt_len, ip, port);
 }
 
-int anetSndbuf(int sfd, int sndsize) 
+int _anetbuf(int sfd, int sndsize,int mode) 
 {
     socklen_t intsize = sizeof(int);
     int max = sndsize;
-    int old_size;
+    int old_size = -1;
 
-    if (getsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &old_size, &intsize) != 0) 
+    if (getsockopt(sfd, SOL_SOCKET, mode, &old_size, &intsize) != 0) 
 	{
-		anetSetError(err, "SO_SNDBUF: %s", strerror(errno));
-
         return -1;
     }
 
     while (max > 0) 
 	{
-        if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, (void *)&max, intsize) == 0) 
+        if (setsockopt(sfd, SOL_SOCKET, mode, (void *)&max, intsize) == 0) 
 		{
 			return max;
 			
@@ -724,3 +722,11 @@ int anetSndbuf(int sfd, int sndsize)
 	
 }
 
+int anetSndbuf(int sfd, int sndsize) 
+{
+	return _anetbuf(sfd, sndsize, SO_SNDBUF);
+}
+int anetRcvbuf(int sfd, int sndsize)
+{
+	return _anetbuf(sfd, sndsize, SO_RCVBUF);
+}

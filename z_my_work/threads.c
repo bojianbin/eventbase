@@ -592,20 +592,17 @@ int server_socket_init(int port)
 	int tcp_fd = -1, udp_fd = -1;
 	int listen_conn_add;
 
-	if(port < 0) return -1;
+	if(port < 0) 
+		return -1;
 	tcp_fd = anetTcpServer(NULL, port, NULL , 100);
 	if(tcp_fd < 0) 
 		return -1;
 
 	udp_fd = anetUdpServer(NULL, port, NULL);
 	
-	dispatch_conn_new(udp_fd, conn_read,
-                                  EV_READ | EV_PERSIST,
-                                  UDP_READ_BUFFER_SIZE, udp_transport);
+	dispatch_conn_new(udp_fd, conn_read,EV_READ | EV_PERSIST,UDP_READ_BUFFER_SIZE, udp_transport);
 	
-	listen_conn_add = conn_new(tcp_fd, conn_listening,
-                                             EV_READ | EV_PERSIST, 1,
-                                             tcp_transport, main_base);
+	listen_conn_add = conn_new(tcp_fd, conn_listening,EV_READ | EV_PERSIST, 1,tcp_transport, main_base);
 
 	return 0;
 	

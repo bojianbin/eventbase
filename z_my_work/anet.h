@@ -79,6 +79,8 @@ int anetFormatSock(int fd, char *fmt, size_t fmt_len);
 
 int anetUdpServer(char *err, int port, char *bindaddr);
 int anetSndbuf(int sfd, int sndsize);
+int anetRcvbuf(int sfd, int sndsize);
+
 
 
 #endif

@@ -7,7 +7,7 @@ TARGET = event
 FILTER_OUT = 
 OBJ_s = $(patsubst %.c,%.o,$(wildcard ./*.c))
 CFLAGS += 
-LDFLAGS += -lpthread -l:libevent.a -lrt
+LDFLAGS += -lpthread -l:libevent.a -lrt -l:libiniparser.a
 
 OBJ=$(filter-out $(FILTER_OUT),$(OBJ_s))
 
@@ -20,5 +20,5 @@ all:$(OBJ)
 	@$(CP) $(TARGET) $(TOP_DIR)/build/bin
 	@$(call MESSAGE,"Finished!", $(TARGET))
 clean:
-	@rm -rf *.o $(TARGET) $(TOP_DIR)/build
+	@rm -rf *.o $(TARGET) 
 	@$(call MESSAGE,"Clean!", $(TARGET))

@@ -1,74 +1,109 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include "libini_parser.h"
 
-enum
+#include "iniparser.h"
+
+void create_example_ini_file(void);
+int  parse_ini_file(char * ini_name);
+
+int main(int argc, char * argv[])
 {
-    /* section cmds */
-    CMD_GET,
-    CMD_SET,
-    CMD_RELOAD,
-    CMD_HELP
-};
+    int     status ;
 
+    if (argc<2) 
+	{
+        create_example_ini_file();
+        status = parse_ini_file("example.ini");
+    } else 
+	{
+        status = parse_ini_file(argv[1]);
+    }
+    return status ;
+}
 
-static void cfg_usage(void)
+void create_example_ini_file(void)
 {
-	fprintf(stderr,
-		"Usage: cfg  <command>  [<arguments>]\n\n"
-		"Commands:\n"
-		"\tget        <config> <section> <key> \n"
-		"\n");
+    FILE    *   ini ;
+
+    if ((ini=fopen("example.ini", "w"))==NULL) 
+	{
+        fprintf(stderr, "iniparser: cannot create example.ini\n");
+        return ;
+    }
+
+    fprintf(ini,
+    "#\n"
+    "# This is an example of ini file\n"
+    "#\n"
+    "\n"
+    "[Pizza]\n"
+    "\n"
+    "Ham       =yes ;\n"
+    "Mushrooms =TRUE ;\n"
+    "Capres    =0 ;\n"
+    "Cheese    =Non ;\n"
+    "\n"
+    "\n"
+    "[Wine]\n"
+    "\n"
+    "Grape     =Cabernet Sauvignon ;\n"
+    "Year      =1989 ;\n"
+    "Country   =Spain ;\n"
+    "Alcohol   =12.5  ;\n"
+    "\n");
+    fclose(ini);
 }
 
 
-int main(int argc, char *argv[])
+int parse_ini_file(char * ini_name)
 {
-	int ret = -1;	
-	int cmd;
-	char tmp_str[KEY_VALUE_SIZE];
-	const char *sval;
-	dictionary_t *dic;
+    dictionary  *   ini ;
 
-	if (argc <= 1){
-		cfg_usage();
-		exit(0);
-	}
-	
-	
-	if (!strcasecmp(argv[1], "get"))
-		cmd = CMD_GET;
-	else
-		cmd = CMD_HELP;
+    /* Some temporary variables to hold query results */
+    int             b ;
+    int             i ;
+    double          d ;
+    const char  *   s ;
 
+    ini = iniparser_load(ini_name);
+    if (ini==NULL) 
+	{
+        fprintf(stderr, "cannot parse file: %s\n", ini_name);
+        return -1 ;
+    }
+    iniparser_dump_ini(ini, stderr);
 
-	switch (cmd) {
+	printf("_________________________________________\n");
+    /* Get pizza attributes */
+    printf("Pizza:\n");
 
-	case CMD_GET:
-		if (argc < 5)
-			return ret;
-		
-		dic = lcfg_load_cfg(argv[2]);
-        	if (!dic) {
-			fprintf(stderr, "lcfg_load_cfg %s failed\n", argv[2]);
-			return -1;
-        	}
-		memset(tmp_str, 0, KEY_VALUE_SIZE);
-		sprintf(tmp_str, "%s:%s", argv[3], argv[4]);
-		sval = lcfg_key_getstring(dic, tmp_str, KEY_STRING_NOTFOUND);
-		if (strcmp(sval, KEY_STRING_NOTFOUND)) {
-			printf("%s\n", sval);
-		}
-		lcfg_free_cfg(dic);
-		break;
-	case CMD_HELP:
-		cfg_usage();
-		ret = 0;
-		break;	
+    b = iniparser_getboolean(ini, "pizza:ham", -1);
+    printf("Ham:       [%d]\n", b);
+    b = iniparser_getboolean(ini, "pizza:mushrooms", -1);
+    printf("Mushrooms: [%d]\n", b);
+    b = iniparser_getboolean(ini, "pizza:capres", -1);
+    printf("Capres:    [%d]\n", b);
+    b = iniparser_getboolean(ini, "pizza:cheese", -1);
+    printf("Cheese:    [%d]\n", b);
 
-	}
+    /* Get wine attributes */
+    printf("Wine:\n");
+    s = iniparser_getstring(ini, "wine:grape", NULL);
+    printf("Grape:     [%s]\n", s ? s : "UNDEF");
 
-	return ret;	
+    i = iniparser_getint(ini, "wine:year", -1);
+    printf("Year:      [%d]\n", i);
+
+    s = iniparser_getstring(ini, "wine:country", NULL);
+    printf("Country:   [%s]\n", s ? s : "UNDEF");
+
+    d = iniparser_getdouble(ini, "wine:alcohol", -1.0);
+    printf("Alcohol:   [%g]\n", d);
+
+    iniparser_freedict(ini);
+    return 0 ;
 }
+
+

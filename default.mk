@@ -13,7 +13,9 @@
 
 all: $(PKG_SUBDIRS:%=%/all)
 
-clean: $(PKG_SUBDIRS:%=%/clean)
+clean: $(PKG_SUBDIRS:%=%/clean) clean_build_dir
 
+clean_build_dir:
+	@rm -rf build
 
-.PHONY: clean all
+.PHONY: clean all clean_build_dir

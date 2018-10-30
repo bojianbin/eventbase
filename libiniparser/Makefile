@@ -15,7 +15,7 @@ test_LDFLAGS += -L. -l:libiniparser.a
 CFLAGS += -fPIC 
 
 
-all:shared static tests install
+all:shared static  tests install
 
 shared:$(INI_SHARED) 
 static:$(INI_STATIC) 

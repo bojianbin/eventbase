@@ -14,7 +14,8 @@ static key_value_t setting_parse[] =
 {
 	{"COMMON","num_worker_threads",	&g_setting.num_work_threads,	VALUE_INT,	sizeof(g_setting.num_work_threads)},
 	{"COMMON","server_port",		&g_setting.server_port,			VALUE_INT, 	sizeof(g_setting.server_port)},
-	{"COMMON","max_connections",	&g_setting.max_connections,		VALUE_INT,	sizeof(g_setting.max_connections)}
+	{"COMMON","max_connections",	&g_setting.max_connections,		VALUE_INT,	sizeof(g_setting.max_connections)},
+	{"DETAIL","max_user_rbuf",		&g_setting.max_user_rbuf,		VALUE_INT,	sizeof(g_setting.max_user_rbuf)}
 };
 
 void setting_init(server_setting_t *setting)
@@ -23,9 +24,10 @@ void setting_init(server_setting_t *setting)
 		return;
 	
 	setting->max_connections = 1024;
-	setting->num_work_threads = 1;
+	setting->num_work_threads = 3;
 	setting->server_port = 6737;
 
+	setting->max_user_rbuf = 4096;
 	return;
 }
 int setting_read(server_setting_t *setting)
@@ -165,18 +167,10 @@ int daemonize(int _chdir, int close_stdfd)
 {
     int fd;
 
-    switch (fork()) 
-	{
-	    case -1:
-	        return (-1);
-	    case 0:
-	        break;
-	    default:
-	        return (-1);
-    }
+	if (fork() != 0) 
+		exit(0); /* parent exits */
 
-    if (setsid() == -1)
-        return (-1);
+	setsid(); /* create a new session */
 
     if (_chdir == 1) 
 	{

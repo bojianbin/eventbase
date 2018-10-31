@@ -31,6 +31,8 @@ typedef struct
 	int num_work_threads;
 	int server_port;
 	int max_connections;
+
+	int max_user_rbuf;
 	
 }server_setting_t;
 

@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 #include <string.h>
+#include <sys/prctl.h>
 
 #include "anet.h"
 #include "server_setting.h"
@@ -17,11 +18,13 @@
 #include "event2/event.h"
 #include "event2/event_struct.h"
 
-static EVENT_THREAD *threads;
-conn_t **conns;
-static conn_queue_item_t *cqi_freelist;
+static EVENT_THREAD *threads = NULL;
+conn_t **conns = NULL;
+static conn_queue_item_t *cqi_freelist = NULL;
 static pthread_mutex_t cqi_freelist_lock = PTHREAD_MUTEX_INITIALIZER;
-volatile unsigned int current_time;
+volatile unsigned int current_time = 0;
+static conn_t *listen_conn = NULL;
+
 
 
 /*
@@ -312,7 +315,7 @@ static void conn_close(conn_t *c)
     return;
 }
 
-static int last_thread = -1;
+
 /*
  * Dispatches a new connection to another thread. This is only ever called
  * from the main thread, either during initialization (for UDP) or because
@@ -321,6 +324,7 @@ static int last_thread = -1;
 void dispatch_conn_new(int sfd, enum conn_states init_state, int event_flags,
                        int read_buffer_size, enum network_transport transport) {
 
+	static int last_thread = -1;
 	conn_queue_item_t *item = cqi_new();
     char buf[1];
 	
@@ -353,20 +357,143 @@ void dispatch_conn_new(int sfd, enum conn_states init_state, int event_flags,
     }
 }
 
+read_status_e try_read_udp(conn_t *c)
+{
+	int ret = 0;
+    c->request_addr_size = sizeof(c->request_addr);
+    ret = recvfrom(c->sfd, c->rbuf, c->rsize,
+                   0, (struct sockaddr *)&c->request_addr,
+                   &c->request_addr_size);
+
+	if(ret > 0)
+	{
+		c->rbytes = ret;
+        c->rcurr = c->rbuf;
+		
+		return READ_SOME_DATA;
+	}
+	
+	return READ_NONE;
+}
+read_status_e try_read_network(conn_t *c) 
+{
+    read_status_e gotdata = READ_ERROR;
+    int res;
+    
+
+    if (c->rcurr != c->rbuf) 
+	{
+        if (c->rbytes != 0) /* otherwise there's nothing to copy */
+            memmove(c->rbuf, c->rcurr, c->rbytes);
+        c->rcurr = c->rbuf;
+    }
+
+    while (1) 
+	{
+        if (c->rbytes >= c->rsize) 
+		{
+			int new_size = 0;
+			if(c->rsize == g_setting.max_user_rbuf)
+			{
+				return gotdata;
+			}
+			if(c->rsize * 2 >= g_setting.max_user_rbuf)
+				new_size = g_setting.max_user_rbuf;
+			else
+				new_size = c->rsize * 2;
+            char *new_rbuf = realloc(c->rbuf, new_size);
+            if (!new_rbuf) 
+			{
+                return READ_ERROR;
+            }
+            c->rcurr = c->rbuf = new_rbuf;
+            c->rsize = new_size;
+        }
+
+        int avail = c->rsize - c->rbytes;
+        res = read(c->sfd, c->rbuf + c->rbytes, avail);
+        if (res > 0) 
+		{
+            c->rbytes += res;
+            if (res == avail) 
+			{
+				gotdata = READ_SOME_DATA;
+                continue;
+            } else 
+			{
+				gotdata = READ_DATA_DONE;
+                break;
+            }
+        }
+        if (res == 0) 
+		{
+            return READ_ERROR;
+        }
+        if (res == -1) 
+		{
+            if (errno == EAGAIN || errno == EWOULDBLOCK) 
+			{
+                break;
+            }
+            return READ_ERROR;
+        }
+    }
+	
+    return gotdata;
+}
 
 void drive_machine(conn_t *c)
 {
-	int stop = 0;
+	int stop = false;
+	int sfd;
+	socklen_t addrlen;
+    struct sockaddr_storage addr;
+	
 	if(c == NULL)
 		return;
 
-	while(!stop)
+	while(stop == false)
 	{
 		switch(c->state)
 		{
 			case conn_listening:
+				sfd = accept(c->sfd, (struct sockaddr *)&addr, &addrlen);
+
+	            if (sfd < 0) 
+				{
+	                perror("accept()");
+	                if (errno == EAGAIN || errno == EWOULDBLOCK) 
+					{
+	                    /* these are transient, so don't log anything */
+	                    stop = true;
+	                } else if (errno == EMFILE) 
+	                {
+	                	/*too many open fds*/
+	                    stop = true;
+	                } else 
+					{
+	                    stop = true;
+	                }
+	                break;
+	            }
+	           
+				anetNonBlock(NULL, sfd);
+
+	            if (sfd >= g_setting.max_connections - 1) 
+	           	{
+	                close(sfd);
+					stop = true;
+	            } else 
+				{
+	                dispatch_conn_new(sfd, conn_new_cmd, EV_READ | EV_PERSIST,
+	                                     DATA_BUFFER_SIZE, c->transport);
+	            }
+	            
 				break;
 			case conn_waiting:
+				conn_set_state(c, conn_read);
+            	stop = true;
+			
 				break;
 			case conn_read:
 				break;
@@ -433,52 +560,40 @@ static void thread_libevent_process(int fd, short which, void *arg)
     conn_t *c;
     unsigned int timeout_fd;
 
-    if (read(fd, buf, 1) != 1) 
+    while(read(fd, buf, 1) == 1) 
 	{
-        fprintf(stderr, "Can't read from libevent pipe\n");
-        return;
-    }
-
-    switch (buf[0]) {
-    case 'c':
-        item = cq_pop(me->new_conn_queue);
-
-        if (NULL == item) {
-            break;
-        }
-
-        c = conn_new(item->sfd, item->init_state, item->event_flags,
-                           item->read_buffer_size, item->transport,
-                           me->base);
-        if (c == NULL) 
+	    switch (buf[0]) 
 		{
-            if (item->transport == udp_transport) 
-			{
-                fprintf(stderr, "Can't listen for events on UDP socket\n");
-                exit(1);
-            } else 
-			{
-                close(item->sfd);
-            }
-        } else {
-            c->thread = me;
-        }
+		    case 'c':
+		        item = cq_pop(me->new_conn_queue);
+
+		        if (NULL == item) 
+				{
+		            break;
+		        }
+
+		        c = conn_new(item->sfd, item->init_state, item->event_flags,
+		                           item->read_buffer_size, item->transport,
+		                           me->base);
+		        if (c == NULL) 
+				{
+		            if (item->transport == udp_transport) 
+					{
+		                fprintf(stderr, "Can't listen for events on UDP socket\n");
+		                exit(1);
+		            } else 
+					{
+		                close(item->sfd);
+		            }
+		        } else 
+		       	{
+		            c->thread = me;
+		        }
 
 
-        cqi_free(item);
-        break;
-    /* we were told to pause and report in */
-    case 'p':
-        //register_thread_initialized();
-        break;
-    /* a client socket timed out */
-    case 't':
-        if (read(fd, &timeout_fd, sizeof(timeout_fd)) != sizeof(timeout_fd)) 
-		{
-            return;
-        }
-        //conn_close_idle(conns[timeout_fd]);
-        break;
+		        cqi_free(item);
+		        break;
+	    }
     }
 }
 
@@ -522,10 +637,13 @@ static void setup_thread(EVENT_THREAD *me)
 
 static void *worker_libevent(void *arg) 
 {
+	char thread_name[32] = {0};
     EVENT_THREAD *me = arg;
 
-
-    event_base_loop(me->base, 0);
+	sprintf(thread_name,"event_%d",me - threads + 1);
+	prctl(PR_SET_NAME,thread_name);
+	
+    event_base_dispatch(me->base);
 
     event_base_free(me->base);
 	
@@ -549,9 +667,10 @@ static void create_worker(void *(*func)(void *), void *arg)
 }
 
 
-void eventbase_thread_init(int nthreads, void *arg) 
+void eventbase_thread_init(int nthreads) 
 {
     int         i;
+	int 		ret ;
     int         power;
 
     threads = calloc(nthreads, sizeof(EVENT_THREAD));
@@ -569,11 +688,17 @@ void eventbase_thread_init(int nthreads, void *arg)
             perror("Can't create notify pipe");
             exit(1);
         }
-
+		ret = anetNonBlock(NULL, fds[0]);
+		ret += anetNonBlock(NULL, fds[1]);
+		if(ret != 0)
+		{
+			perror("Can not set nonblock");
+        	exit(1);
+		}
         threads[i].notify_receive_fd = fds[0];
         threads[i].notify_send_fd = fds[1];
 
-        //setup_thread(&threads[i]);
+        setup_thread(&threads[i]);
     }
 
     /* Create threads after we've done all the libevent setup. */
@@ -585,26 +710,46 @@ void eventbase_thread_init(int nthreads, void *arg)
 	return;
 }
 
-#define UDP_READ_BUFFER_SIZE 65536
-
-int server_socket_init(int port)
+int eventbase_data_init()
 {
+	conn_init();
+
+	return 0;
+}
+
+int server_socket_init(int port,struct event_base *main_base)
+{
+	int i = 0;
 	int tcp_fd = -1, udp_fd = -1;
-	int listen_conn_add;
+	conn_t *listen_conn_add;
 
 	if(port < 0) 
-		return -1;
+		goto ERR;
+
 	tcp_fd = anetTcpServer(NULL, port, NULL , 100);
 	if(tcp_fd < 0) 
-		return -1;
-
-	udp_fd = anetUdpServer(NULL, port, NULL);
+		goto ERR;
+	anetNonBlock(NULL, tcp_fd);
 	
-	dispatch_conn_new(udp_fd, conn_read,EV_READ | EV_PERSIST,UDP_READ_BUFFER_SIZE, udp_transport);
+	udp_fd = anetUdpServer(NULL, port, NULL);
+	if(udp_fd < 0 )
+		goto ERR;
+
+	for( i = 0 ; i < g_setting.num_work_threads ; i++)
+	{
+		int per_thread_fd = i != 0 ? dup(udp_fd) : udp_fd;
+		dispatch_conn_new(per_thread_fd, conn_read,EV_READ | EV_PERSIST,UDP_READ_BUFFER_SIZE, udp_transport);
+	}
 	
 	listen_conn_add = conn_new(tcp_fd, conn_listening,EV_READ | EV_PERSIST, 1,tcp_transport, main_base);
 
+	listen_conn_add->next = listen_conn;
+	listen_conn = listen_conn_add;
+
 	return 0;
-	
+ERR:
+	if(tcp_fd >= 0 ) close(tcp_fd);
+	if(udp_fd >= 0) close(udp_fd);
+	return -1;
 }
 

@@ -23,7 +23,26 @@
 /** Initial number of sendmsg() argument structures to allocate. */
 #define MSG_LIST_INITIAL 10
 
+#define UDP_READ_BUFFER_SIZE 65536
 
+#ifndef true
+#define true 1
+#endif
+#ifndef false
+#define false 0
+#endif
+
+typedef enum
+{
+	/*reads > 0 && may have remaining data to read*/
+	READ_SOME_DATA,
+	/*reads > 0 && no remaining data*/
+	READ_DATA_DONE,
+	/*reads < 0 && errno == EWOULDBLOCK*/
+	READ_NONE,
+	/*reads <= 0 && errno != EWOULDBLOCK && errno != EAGIN*/
+	READ_ERROR
+}read_status_e;
 
 enum conn_states 
 {
@@ -129,6 +148,9 @@ typedef struct conn_s
 
 
 
-int server_socket_init(int port);
+int eventbase_data_init();
+int server_socket_init(int port,struct event_base *main_base);
+void eventbase_thread_init(int nthreads) ;
+
 
 #endif

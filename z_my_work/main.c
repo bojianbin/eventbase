@@ -11,6 +11,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <sys/prctl.h>
+
 
 #include "server_setting.h"
 #include "event2/event.h"
@@ -19,6 +21,7 @@
 extern server_setting_t g_setting;
 int main()
 {
+	int ret;
 	struct event_base *main_base = NULL;
 	struct event_config *ev_config = NULL;
 	
@@ -29,12 +32,27 @@ int main()
 	daemonize(0,0);
 	adjust_max_fd(g_setting.max_connections);
 
+	eventbase_data_init();
+	
 	ev_config = event_config_new();
     event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
     main_base = event_base_new_with_config(ev_config);
     event_config_free(ev_config);
 
+	eventbase_thread_init(g_setting.num_work_threads);
+	ret = server_socket_init(g_setting.server_port,main_base);
+	if(ret < 0)
+	{
+		printf("server_socket_init error\n");
+		exit(-1);
+	}
 	
+	prctl(PR_SET_NAME,"event_main");
+	/*main loop*/
+	event_base_dispatch(main_base);
 
+
+	event_base_free(main_base);
+	
     return 0;
 }

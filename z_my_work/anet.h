@@ -31,6 +31,12 @@
 #ifndef ANET_H
 #define ANET_H
 
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #include <sys/types.h>
 
 #define ANET_OK 0
@@ -81,6 +87,9 @@ int anetUdpServer(char *err, int port, char *bindaddr);
 int anetSndbuf(int sfd, int sndsize);
 int anetRcvbuf(int sfd, int sndsize);
 
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif

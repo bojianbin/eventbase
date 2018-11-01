@@ -8,6 +8,11 @@
 #ifndef _THREADS_H
 #define _THREADS_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #include <sys/socket.h>
 #include "event2/event_struct.h"
 
@@ -24,6 +29,8 @@
 #define MSG_LIST_INITIAL 10
 
 #define UDP_READ_BUFFER_SIZE 65536
+#define UDP_MAX_PAYLOAD_SIZE 1400
+
 
 #ifndef true
 #define true 1
@@ -44,40 +51,42 @@ typedef enum
 	READ_ERROR
 }read_status_e;
 
-enum conn_states 
+typedef enum
 {
     conn_listening,  /**< the socket which listens for connections */
-    conn_new_cmd,    /**< Prepare connection for next command */
-    conn_waiting,    /**< waiting for a readable socket */
     conn_read,       /**< reading in a command line */
     conn_parse_cmd,  /**< try to parse a command from the input buffer */
     conn_write,      /**< writing out a simple response */
-    conn_nread,      /**< reading in a fixed number of bytes */
-    conn_swallow,    /**< swallowing unnecessary bytes w/o storing */
     conn_closing,    /**< closing this connection */
     conn_mwrite,     /**< writing out many items sequentially */
     conn_closed,     /**< connection is closed */
-    conn_watch,      /**< held by the logger thread as a watcher */
     conn_max_state   /**< Max state value (used for assertion) */
-};
+}conn_states_e;
+
+typedef enum 
+{
+    TRANSMIT_COMPLETE,   /** All done writing. */
+    TRANSMIT_INCOMPLETE, /** More data remaining to write. */
+    //TRANSMIT_SOFT_ERROR, /** Can't write any more right now. */
+    TRANSMIT_ERROR  /** Can't write (c->state is set to conn_closing) */
+}transmit_result_e;
 
 
-
-enum network_transport 
+typedef enum  
 {
     local_transport, /* Unix sockets*/
     tcp_transport,
     udp_transport
-};
+}network_transport_e;
 
 struct conn_s;
 typedef struct conn_queue_item_s
 {
     int               		sfd;
-    enum conn_states  		init_state;
+    conn_states_e  		init_state;
     int               		event_flags;
     int               		read_buffer_size;
-    enum network_transport  transport;
+    network_transport_e  transport;
     struct conn_s 					*c;
     struct conn_queue_item_s          		*next;
 }conn_queue_item_t;
@@ -104,9 +113,13 @@ typedef struct
 typedef struct conn_s
 {
     int    sfd;
-    enum conn_states  state;
+    conn_states_e  state;
+	read_status_e read_state;
     unsigned int last_cmd_time;
+	/*event for read*/
     struct event event;
+	/*event for write*/
+	struct event wevent;
     short  ev_flags;
     short  which;   /** which events were just triggered */
 
@@ -120,7 +133,7 @@ typedef struct conn_s
     int    wsize;
     int    wbytes;
     /** which state to go into after finishing current write */
-    enum conn_states  write_and_go;
+    conn_states_e  write_and_go;
     void   *write_and_free; /** free this memory after finishing writing */
 
 
@@ -136,7 +149,7 @@ typedef struct conn_s
     int    msgbytes;  /* number of bytes in current msg */
 
 
-    enum network_transport transport; /* what transport is used by this connection */
+    network_transport_e transport; /* what transport is used by this connection */
 
     /* data for UDP clients */
     struct sockaddr_in6 request_addr; /* udp: Who sent the most recent request */
@@ -151,6 +164,10 @@ typedef struct conn_s
 int eventbase_data_init();
 int server_socket_init(int port,struct event_base *main_base);
 void eventbase_thread_init(int nthreads) ;
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif

@@ -15,6 +15,7 @@
 #include "anet.h"
 #include "server_setting.h"
 #include "threads.h"
+#include "cmd_parse.h"
 #include "event2/event.h"
 #include "event2/event_struct.h"
 
@@ -188,9 +189,9 @@ void conn_free(conn_t *c)
     }
 }
 void event_handler(const int fd, const short which, void *arg) ;
-conn_t *conn_new(const int sfd, enum conn_states init_state,
+conn_t *conn_new(const int sfd, conn_states_e init_state,
                 const int event_flags,
-                const int read_buffer_size, enum network_transport transport,
+                const int read_buffer_size, network_transport_e transport,
                 struct event_base *base) 
 
 {
@@ -236,7 +237,7 @@ conn_t *conn_new(const int sfd, enum conn_states init_state,
     c->request_addr_size = sizeof(c->request_addr);
   
 
-    if (transport == tcp_transport && init_state == conn_new_cmd) 
+    if (transport == tcp_transport ) 
 	{
         if (getpeername(sfd, (struct sockaddr *) &c->request_addr,
                         &c->request_addr_size)) {
@@ -276,7 +277,7 @@ conn_t *conn_new(const int sfd, enum conn_states init_state,
  * processing that needs to happen on certain state transitions can
  * happen here.
  */
-static void conn_set_state(conn_t *c, enum conn_states state) 
+static void conn_set_state(conn_t *c, conn_states_e state) 
 {
     if (state != c->state) 
 	{
@@ -321,8 +322,8 @@ static void conn_close(conn_t *c)
  * from the main thread, either during initialization (for UDP) or because
  * of an incoming connection.
  */
-void dispatch_conn_new(int sfd, enum conn_states init_state, int event_flags,
-                       int read_buffer_size, enum network_transport transport) {
+void dispatch_conn_new(int sfd, conn_states_e init_state, int event_flags,
+                       int read_buffer_size, network_transport_e transport) {
 
 	static int last_thread = -1;
 	conn_queue_item_t *item = cqi_new();
@@ -377,7 +378,7 @@ read_status_e try_read_udp(conn_t *c)
 }
 read_status_e try_read_network(conn_t *c) 
 {
-    read_status_e gotdata = READ_ERROR;
+    read_status_e gotdata = READ_NONE;
     int res;
     
 
@@ -393,9 +394,9 @@ read_status_e try_read_network(conn_t *c)
         if (c->rbytes >= c->rsize) 
 		{
 			int new_size = 0;
-			if(c->rsize == g_setting.max_user_rbuf)
+			if(c->rsize >= g_setting.max_user_rbuf)
 			{
-				return gotdata;
+				return READ_SOME_DATA;
 			}
 			if(c->rsize * 2 >= g_setting.max_user_rbuf)
 				new_size = g_setting.max_user_rbuf;
@@ -433,8 +434,7 @@ read_status_e try_read_network(conn_t *c)
 		{
             if (errno == EAGAIN || errno == EWOULDBLOCK) 
 			{
-				return READ_DATA_DONE;
-                break;
+				return gotdata;
             }
             return READ_ERROR;
         }
@@ -443,11 +443,218 @@ read_status_e try_read_network(conn_t *c)
     return gotdata;
 }
 
+
+/*
+ * Ensures that there is room for another struct iovec in a connection's
+ * iov list.
+ *
+ * Returns 0 on success, -1 on out-of-memory.
+ */
+static int ensure_iov_space(conn_t *c) 
+{
+    if(c == NULL)
+		return -1;
+
+    if (c->iovused >= c->iovsize) 
+	{
+        int i, iovnum;
+        struct iovec *new_iov = (struct iovec *)realloc(c->iov,(c->iovsize * 2) * sizeof(struct iovec));
+        if (! new_iov) 
+		{
+            return -1;
+        }
+        c->iov = new_iov;
+        c->iovsize *= 2;
+
+        /* Point all the msghdr structures at the new list. */
+        for (i = 0, iovnum = 0; i < c->msgused; i++) 
+		{
+            c->msglist[i].msg_iov = &c->iov[iovnum];
+            iovnum += c->msglist[i].msg_iovlen;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Adds a message header to a connection.
+ *
+ * Returns 0 on success, -1 on out-of-memory.
+ */
+static int add_msghdr(conn_t *c)
+{
+    struct msghdr *msg;
+
+    if(c == NULL)
+    {
+    	return -1;
+    }
+
+    if (c->msgsize == c->msgused) 
+	{
+        msg = realloc(c->msglist, c->msgsize * 2 * sizeof(struct msghdr));
+        if (! msg) 
+		{
+            return -1;
+        }
+        c->msglist = msg;
+        c->msgsize *= 2;
+    }
+
+    msg = c->msglist + c->msgused;
+
+    /* this wipes msg_iovlen, msg_control, msg_controllen, and
+       msg_flags, the last 3 of which aren't defined on solaris: */
+    memset(msg, 0, sizeof(struct msghdr));
+
+    msg->msg_iov = &c->iov[c->iovused];
+
+    if (c->transport == udp_transport && c->request_addr_size > 0) 
+	{
+        msg->msg_name = &c->request_addr;
+        msg->msg_namelen = c->request_addr_size;
+    }
+
+    c->msgbytes = 0;
+    c->msgused++;
+
+    return 0;
+}
+
+
+
+int eventbase_add_write_data(conn_t *c, const void *buf, int len) 
+{
+    struct msghdr *m;
+    int leftover;
+
+	if(buf == NULL || len <= 0 )
+		return -1;
+
+    if (c->transport == udp_transport) 
+	{
+        do {
+            m = &c->msglist[c->msgused - 1];
+
+            /*
+             * Limit UDP packets to UDP_MAX_PAYLOAD_SIZE bytes.
+             */
+
+            /* We may need to start a new msghdr if this one is full. */
+            if (m->msg_iovlen == IOV_MAX ||
+                (c->msgbytes >= UDP_MAX_PAYLOAD_SIZE)) 
+           	{
+                add_msghdr(c);
+                m = &c->msglist[c->msgused - 1];
+            }
+
+            if (ensure_iov_space(c) != 0)
+                return -1;
+
+            /* If the fragment is too big to fit in the datagram, split it up */
+            if (len + c->msgbytes > UDP_MAX_PAYLOAD_SIZE) 
+			{
+                leftover = len + c->msgbytes - UDP_MAX_PAYLOAD_SIZE;
+                len -= leftover;
+            } else 
+			{
+                leftover = 0;
+            }
+
+            m = &c->msglist[c->msgused - 1];
+            m->msg_iov[m->msg_iovlen].iov_base = (void *)buf;
+            m->msg_iov[m->msg_iovlen].iov_len = len;
+
+            c->msgbytes += len;
+            c->iovused++;
+            m->msg_iovlen++;
+
+            buf = ((char *)buf) + len;
+            len = leftover;
+        } while (leftover > 0);
+
+    } else 
+	{
+        /* Optimized path for TCP connections */
+        m = &c->msglist[c->msgused - 1];
+        if (m->msg_iovlen == IOV_MAX) {
+            add_msghdr(c);
+            m = &c->msglist[c->msgused - 1];
+        }
+
+        if (ensure_iov_space(c) != 0)
+            return -1;
+
+        m->msg_iov[m->msg_iovlen].iov_base = (void *)buf;
+        m->msg_iov[m->msg_iovlen].iov_len = len;
+        c->msgbytes += len;
+        c->iovused++;
+        m->msg_iovlen++;
+    }
+
+    return 0;
+}
+
+
+transmit_result_e try_send_data(conn_t *c) 
+{
+
+ 	while(1)
+ 	{
+	    if (c->msgcurr < c->msgused && c->msglist[c->msgcurr].msg_iovlen != 0) 
+		{
+	        ssize_t res;
+	        struct msghdr *m = &c->msglist[c->msgcurr];
+
+	        res = sendmsg(c->sfd, m, 0);
+	        if (res > 0) 
+			{
+
+
+	            /* We've written some of the data. Remove the completed
+	               iovec entries from the list of pending writes. */
+	            while (m->msg_iovlen > 0 && res >= m->msg_iov->iov_len) 
+				{
+	                res -= m->msg_iov->iov_len;
+	                m->msg_iovlen--;
+	                m->msg_iov++;
+	            }
+
+	            /* Might have written just part of the last iovec entry;
+	               adjust it so the next write will do the rest. */
+	            if (res > 0) 
+				{
+	                m->msg_iov->iov_base = (caddr_t)m->msg_iov->iov_base + res;
+	                m->msg_iov->iov_len -= res;
+					return TRANSMIT_INCOMPLETE;
+	            }
+	           	c->msgcurr++;
+				continue;
+	        }
+	        if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) 
+			{
+	            return TRANSMIT_INCOMPLETE;
+	        }
+	        /* if res == 0 or res == -1 and error is not EAGAIN or EWOULDBLOCK,
+	           we have a real error, on which we close the connection */
+
+	        return TRANSMIT_ERROR;
+	    } else 
+		{
+	        return TRANSMIT_COMPLETE;
+	    }
+		c->msgcurr++;
+ 	}
+}
+
 void drive_machine(conn_t *c)
 {
 	int stop = false;
 	int sfd;
 	socklen_t addrlen;
+	read_status_e read_ret;
+	parse_status_e parse_ret;
     struct sockaddr_storage addr;
 	
 	if(c == NULL)
@@ -486,40 +693,89 @@ void drive_machine(conn_t *c)
 					stop = true;
 	            } else 
 				{
-	                dispatch_conn_new(sfd, conn_new_cmd, EV_READ | EV_PERSIST,
+	                dispatch_conn_new(sfd, conn_read, EV_READ | EV_PERSIST,
 	                                     DATA_BUFFER_SIZE, c->transport);
 	            }
 	            
 				break;
-			case conn_waiting:
-				conn_set_state(c, conn_read);
-            	stop = true;
-			
-				break;
+				
 			case conn_read:
+				if(c->transport == udp_transport)
+					read_ret = try_read_udp(c);
+				else
+					read_ret = try_read_network(c);
+				c->read_state = read_ret;
+				switch (read_ret) 
+				{
+		            case READ_NONE:
+						stop = true;
+		                break;
+		            case READ_DATA_DONE:
+					case READ_SOME_DATA:
+		                conn_set_state(c, conn_parse_cmd);
+		                break;
+		            case READ_ERROR:
+		                conn_set_state(c, conn_closing);
+		                break;
+	            }
+				
 				break;
 			case conn_parse_cmd:
-				break;
-			case conn_new_cmd:
-				break;
-			case conn_nread:
-				break;
-			case conn_swallow:
+				parse_ret = protocol_parse(c);
+				switch(parse_ret)
+				{
+					case PARSE_DONE:
+						conn_set_state(c, conn_read);
+						/*no data in user read buffer*/
+						if(c->read_state != READ_SOME_DATA)	
+							stop = true;
+						break;
+					case PARSE_ERROR:
+						conn_set_state(c, conn_closing);
+						break;
+				}
 				break;
 			case conn_write:
-				break;
+				if (eventbase_add_write_data(c, c->wcurr, c->wbytes) != 0) 
+				{
+                    conn_set_state(c, conn_closing);
+                    break;
+                }
+				/*fall through ...*/
 			case conn_mwrite:
+				
+				switch (try_send_data(c)) 
+				{
+					case TRANSMIT_COMPLETE:
+						eventbase_delete_wevent(c);
+						stop = true;
+						break;
+		
+					case TRANSMIT_INCOMPLETE:
+						stop = true;
+						break;
+					case TRANSMIT_ERROR:
+						if(c->transport == udp_transport)
+						{
+							eventbase_delete_wevent(c);
+						}else
+						{
+							conn_set_state(c, conn_closing);
+						}
+				}
+				
 				break;
 			case conn_closing:
-				break;
+				if (c->transport == udp_transport)
+	                conn_cleanup(c);
+	            else
+	                conn_close(c);
+	            stop = true;
+	            break;
 			case conn_closed:
 	            /* This only happens if dormando is an idiot. */
 	            abort();
 	            break;
-       		case conn_watch:
-            	/* We handed off our connection to the logger thread. */
-            	stop = 1;
-            	break;
         	case conn_max_state:
             	break;
 		}
@@ -547,6 +803,21 @@ void event_handler(const int fd, const short which, void *arg)
 
     /* wait for next event */
     return;
+}
+void eventbase_add_wevent(conn_t *c,int simple_write)
+{
+	if(simple_write)
+		c->state = conn_write;
+	else
+		c->state = conn_mwrite;
+	
+	event_assign(&c->wevent, c->thread->base, c->sfd, EV_WRITE | EV_PERSIST , 
+		event_handler, c);
+	event_add(&c->wevent,NULL);
+}
+void eventbase_delete_wevent(conn_t *c)
+{
+	event_del(&c->wevent);
 }
 
 /*
@@ -713,6 +984,7 @@ void eventbase_thread_init(int nthreads)
 
 int eventbase_data_init()
 {
+
 	conn_init();
 
 	return 0;

@@ -433,6 +433,7 @@ read_status_e try_read_network(conn_t *c)
 		{
             if (errno == EAGAIN || errno == EWOULDBLOCK) 
 			{
+				return READ_DATA_DONE;
                 break;
             }
             return READ_ERROR;

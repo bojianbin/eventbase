@@ -256,7 +256,6 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
     c->last_cmd_time = current_time; /* initialize for idle kicker */
 
 
-    c->write_and_go = init_state;
     c->write_and_free = 0;
 
 
@@ -359,18 +358,17 @@ void dispatch_conn_new(int sfd, conn_states_e init_state, int event_flags,
 }
 
 read_status_e try_read_udp(conn_t *c)
-{
+{		
 	int ret = 0;
+	int avail = c->rsize - c->rbytes;
     c->request_addr_size = sizeof(c->request_addr);
-    ret = recvfrom(c->sfd, c->rbuf, c->rsize,
+    ret = recvfrom(c->sfd, c->rbuf + c->rbytes , avail,
                    0, (struct sockaddr *)&c->request_addr,
                    &c->request_addr_size);
 
 	if(ret > 0)
 	{
-		c->rbytes = ret;
-        c->rcurr = c->rbuf;
-		
+		c->rbytes += ret;	
 		return READ_SOME_DATA;
 	}
 	
@@ -381,13 +379,6 @@ read_status_e try_read_network(conn_t *c)
     read_status_e gotdata = READ_NONE;
     int res;
     
-
-    if (c->rcurr != c->rbuf) 
-	{
-        if (c->rbytes != 0) /* otherwise there's nothing to copy */
-            memmove(c->rbuf, c->rcurr, c->rbytes);
-        c->rcurr = c->rbuf;
-    }
 
     while (1) 
 	{
@@ -522,7 +513,25 @@ static int add_msghdr(conn_t *c)
     return 0;
 }
 
+int eventbase_copy_write_date(conn_t *c , void *buf, int len)
+{
+	if(!c || !buf || len <= 0 || len > c->wsize - c->wbytes)
+		return -1;
 
+	int re_pos = (c->wcurr - c->wbuf + c->wbytes) % c->wsize;
+	if( re_pos + len > c->wsize)
+	{
+		memmove( c->wbuf + re_pos,buf,c->wsize - re_pos);
+		memmove(c->wbuf,buf + c->wsize - re_pos ,len - (c->wsize - re_pos) );
+		
+	}else
+	{
+		memmove( c->wbuf + re_pos,buf,len);
+	}
+	
+	c->wbytes += len;	
+	
+}
 
 int eventbase_add_write_data(conn_t *c, const void *buf, int len) 
 {
@@ -596,8 +605,69 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
     return 0;
 }
 
-
 transmit_result_e try_send_data(conn_t *c) 
+{
+	int ret = 0;
+	int send_num = 0;
+	int data_line_num, data_line2_num;
+	int re_line = (c->wcurr - c->wbuf + c->wbytes) / c->wsize ;
+	int re_pos = (c->wcurr - c->wbuf + c->wbytes) % c->wsize ;
+
+	if(c->wbytes <= 0) return TRANSMIT_COMPLETE;
+	if(re_line )
+	{
+		data_line_num = c->wbytes - (c->wcurr - c->wbuf) ;
+		data_line2_num = c->wbytes - data_line_num;
+	}else
+	{
+		data_line_num = c->wbytes - (c->wcurr - c->wbuf) ;
+		data_line2_num = 0;
+	}
+
+	if(data_line_num)
+	{
+		ret = send(c->sfd,c->wcurr,data_line_num);
+		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGIN))
+		{
+			return TRANSMIT_COMPLETE;
+		}else if(ret > 0)
+		{
+			c->wcurr += ret ;
+			c->wbytes -= ret ;
+			if(ret != data_line_num)
+			{
+				return TRANSMIT_COMPLETE
+			}
+		}else
+		{
+			return TRANSMIT_ERROR;
+		}
+	}
+	if(data_line2_num)
+	{
+		c->wcurr = c->wbuf;
+		ret = send(c->sfd,c->wcurr,data_line2_num);
+		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGIN))
+		{
+			return TRANSMIT_COMPLETE;
+		}else if(ret > 0)
+		{
+			c->wcurr += ret ;
+			c->wbytes -= ret ;
+			if(ret != data_line2_num)
+			{
+				return TRANSMIT_COMPLETE
+			}
+		}else
+		{
+			return TRANSMIT_ERROR;
+		}
+	}
+
+	return TRANSMIT_COMPLETE;
+}
+
+transmit_result_e try_send_mdata(conn_t *c) 
 {
 
  	while(1)
@@ -647,11 +717,46 @@ transmit_result_e try_send_data(conn_t *c)
 		c->msgcurr++;
  	}
 }
+void eventbase_add_wevent(conn_t *c)
+{
+	if(c->wstate != conn_nowrite)
+		return;
+	if(c->wbytes != 0)
+		c->wstate = conn_write;
+	else
+		c->wstate = conn_mwrite;
+
+
+	event_assign(&c->wevent, c->thread->base, c->sfd, EV_WRITE | EV_PERSIST , 
+		event_handler, c);
+	event_add(&c->wevent,NULL);
+}
+void eventbase_delete_wevent(conn_t *c)
+{
+	if(c->wstate == conn_nowrite)
+		return;
+	
+	c->wstate = conn_nowrite;
+	switch(c->wstate)
+	{
+		case conn_nowrite:
+			return;
+		case conn_write:
+			c->wstate = conn_mwrite;
+			return;
+		case conn_mwrite:
+			event_del(&c->wevent);
+			break;
+	}
+	
+	return;
+}
 
 void drive_machine(conn_t *c)
 {
 	int stop = false;
 	int sfd;
+	int parse_len = 0;
 	socklen_t addrlen;
 	read_status_e read_ret;
 	parse_status_e parse_ret;
@@ -721,50 +826,40 @@ void drive_machine(conn_t *c)
 				
 				break;
 			case conn_parse_cmd:
-				parse_ret = protocol_parse(c);
+				parse_len = 0;
+				parse_ret = protocol_parse(c,&parse_len);
+				if(parse_len < 0 || parse_len > c->rsize)
+				{/*value parse_len illegal*/
+					conn_set_state(c, conn_closing);
+					break;
+				}
 				switch(parse_ret)
 				{
+					case PARSE_DONE_NEED_WRITE:
+						eventbase_add_wevent(c);
 					case PARSE_DONE:
 						conn_set_state(c, conn_read);
 						/*no data in user read buffer*/
 						if(c->read_state != READ_SOME_DATA)	
 							stop = true;
+
+	
+						c->rbytes -= parse_len;
+						c->rcurr += parse_len;
+						if (c->rcurr != c->rbuf) 
+						{
+					        if (c->rbytes != 0) /* otherwise there's nothing to copy */
+					            memmove(c->rbuf, c->rcurr, c->rbytes);
+					        c->rcurr = c->rbuf;
+					    }
+						
 						break;
 					case PARSE_ERROR:
 						conn_set_state(c, conn_closing);
 						break;
 				}
 				break;
-			case conn_write:
-				if (eventbase_add_write_data(c, c->wcurr, c->wbytes) != 0) 
-				{
-                    conn_set_state(c, conn_closing);
-                    break;
-                }
-				/*fall through ...*/
-			case conn_mwrite:
-				
-				switch (try_send_data(c)) 
-				{
-					case TRANSMIT_COMPLETE:
-						eventbase_delete_wevent(c);
-						stop = true;
-						break;
-		
-					case TRANSMIT_INCOMPLETE:
-						stop = true;
-						break;
-					case TRANSMIT_ERROR:
-						if(c->transport == udp_transport)
-						{
-							eventbase_delete_wevent(c);
-						}else
-						{
-							conn_set_state(c, conn_closing);
-						}
-				}
-				
-				break;
+
 			case conn_closing:
 				if (c->transport == udp_transport)
 	                conn_cleanup(c);
@@ -784,6 +879,68 @@ void drive_machine(conn_t *c)
 
 	return;
 }
+void write_machine(conn_t *c)
+{
+	int stop = false;
+	
+	while(stop == false)
+	{
+		switch(c->wstate)
+		{
+			case conn_write:
+				switch (try_send_data(c)) 
+				{
+					case TRANSMIT_COMPLETE:
+						eventbase_delete_wevent(c);
+						stop = true;
+						break;
+
+					case TRANSMIT_INCOMPLETE:
+						stop = true;
+						break;
+					case TRANSMIT_ERROR:
+						if(c->transport == udp_transport)
+						{
+							eventbase_delete_wevent(c);
+						}else
+						{
+							conn_set_state(c, conn_wclosing);
+						}
+				}
+				break;
+				
+			case conn_mwrite:
+				switch (try_send_mdata(c)) 
+				{
+					case TRANSMIT_COMPLETE:
+						eventbase_delete_wevent(c);
+						stop = true;
+						break;
+
+					case TRANSMIT_INCOMPLETE:
+						stop = true;
+						break;
+					case TRANSMIT_ERROR:
+						if(c->transport == udp_transport)
+						{
+							eventbase_delete_wevent(c);
+						}else
+						{
+							conn_set_state(c, conn_wclosing);
+						}
+				}
+				break;
+			case conn_wclosing:
+				if (c->transport == udp_transport)
+		            conn_cleanup(c);
+		        else
+		            conn_close(c);
+		        stop = true;
+		        break;
+		}
+	}
+}
+
 void event_handler(const int fd, const short which, void *arg) 
 {
     conn_t *c;
@@ -804,21 +961,7 @@ void event_handler(const int fd, const short which, void *arg)
     /* wait for next event */
     return;
 }
-void eventbase_add_wevent(conn_t *c,int simple_write)
-{
-	if(simple_write)
-		c->state = conn_write;
-	else
-		c->state = conn_mwrite;
-	
-	event_assign(&c->wevent, c->thread->base, c->sfd, EV_WRITE | EV_PERSIST , 
-		event_handler, c);
-	event_add(&c->wevent,NULL);
-}
-void eventbase_delete_wevent(conn_t *c)
-{
-	event_del(&c->wevent);
-}
+
 
 /*
  * Processes an incoming "handle a new connection" item. This is called when

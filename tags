@@ -144,7 +144,7 @@ DOUBLES_EQUAL	libcJSON/tests/unity/extras/fixture/src/unity_fixture.h	77;"	d
 D_unity_output_Spy_H	libcJSON/tests/unity/extras/fixture/test/unity_output_Spy.h	9;"	d
 E	libcJSON/tests/unity/test/Makefile	/^E = -Weverything$/;"	m
 EVENT_DIR	libevent/Makefile	/^EVENT_DIR=$(TOP_DIR)\/libevent\/$(TARGET)$/;"	m
-EVENT_THREAD	z_my_work/threads.h	/^} EVENT_THREAD;$/;"	t	typeref:struct:__anon15
+EVENT_THREAD	z_my_work/threads.h	/^} EVENT_THREAD;$/;"	t	typeref:struct:__anon16
 EXPAND_AND_USE_2ND	libcJSON/tests/unity/extras/fixture/test/unity_fixture_Test.c	352;"	d	file:
 EXPAND_AND_USE_2ND	libcJSON/tests/unity/test/tests/testunity.c	3298;"	d	file:
 EXPECT_ABORT_BEGIN	libcJSON/tests/unity/extras/fixture/test/unity_fixture_Test.c	333;"	d	file:
@@ -193,6 +193,7 @@ INSTALL_DATA	rules.mk	/^INSTALL_DATA:=install -m0644$/;"	m
 INSTALL_DIR	rules.mk	/^INSTALL_DIR:=install -d -m0755$/;"	m
 INVALID	libcJSON/cJSON_Utils.c	/^enum patch_operation { INVALID, ADD, REMOVE, REPLACE, MOVE, COPY, TEST };$/;"	e	enum:patch_operation	file:
 IOV_LIST_INITIAL	z_my_work/threads.h	26;"	d
+IOV_MAX	z_my_work/threads.h	36;"	d
 ITEMS_PER_ALLOC	z_my_work/threads.h	21;"	d
 InternalMalloc	libcJSON/tests/unity/extras/fixture/test/unity_fixture_Test.c	/^TEST_GROUP(InternalMalloc);$/;"	v
 IsStringInBiggerString	libcJSON/tests/unity/src/unity.c	/^int IsStringInBiggerString(const char* longstring, const char* shortstring)$/;"	f
@@ -225,8 +226,9 @@ NumbersToFind	libcJSON/tests/unity/examples/example_3/src/ProductionCode.c	/^int
 OBJ	z_my_work/Makefile	/^OBJ=$(filter-out $(FILTER_OUT),$(OBJ_s))$/;"	m
 OBJ_s	libiniparser/Makefile	/^OBJ_s = $(patsubst %.c,%.o,$(wildcard .\/*.c))$/;"	m
 OBJ_s	z_my_work/Makefile	/^OBJ_s = $(patsubst %.c,%.o,$(wildcard .\/*.c))$/;"	m
-PARSE_DONE	z_my_work/cmd_parse.h	/^	PARSE_DONE,$/;"	e	enum:__anon16
-PARSE_ERROR	z_my_work/cmd_parse.h	/^	PARSE_ERROR,$/;"	e	enum:__anon16
+PARSE_DONE	z_my_work/cmd_parse.h	/^	PARSE_DONE,$/;"	e	enum:__anon17
+PARSE_DONE_NEED_WRITE	z_my_work/cmd_parse.h	/^	PARSE_DONE_NEED_WRITE,$/;"	e	enum:__anon17
+PARSE_ERROR	z_my_work/cmd_parse.h	/^	PARSE_ERROR$/;"	e	enum:__anon17
 ParseOutput	libcJSON/tests/unity/auto/parse_output.rb	/^class ParseOutput$/;"	c
 PointerPair	libcJSON/tests/unity/extras/fixture/src/unity_fixture.c	/^struct PointerPair$/;"	s	file:
 ProductionCode	libcJSON/tests/unity/examples/example_2/test/TestProductionCode.c	/^TEST_GROUP(ProductionCode);$/;"	v
@@ -747,9 +749,9 @@ TOP_DIR	libcJSON/Makefile	/^TOP_DIR:=${_TOPDIR}$/;"	m
 TOP_DIR	libevent/Makefile	/^TOP_DIR:=${_TOPDIR}$/;"	m
 TOP_DIR	libiniparser/Makefile	/^TOP_DIR:=${_TOPDIR}$/;"	m
 TOP_DIR	z_my_work/Makefile	/^TOP_DIR:=${_TOPDIR}$/;"	m
-TRANSMIT_COMPLETE	z_my_work/threads.h	/^    TRANSMIT_COMPLETE,   \/** All done writing. *\/$/;"	e	enum:__anon13
-TRANSMIT_ERROR	z_my_work/threads.h	/^    TRANSMIT_ERROR  \/** Can't write (c->state is set to conn_closing) *\/$/;"	e	enum:__anon13
-TRANSMIT_INCOMPLETE	z_my_work/threads.h	/^    TRANSMIT_INCOMPLETE, \/** More data remaining to write. *\/$/;"	e	enum:__anon13
+TRANSMIT_COMPLETE	z_my_work/threads.h	/^    TRANSMIT_COMPLETE,   \/** All done writing. *\/$/;"	e	enum:__anon14
+TRANSMIT_ERROR	z_my_work/threads.h	/^    TRANSMIT_ERROR  \/** Can't write (c->state is set to conn_closing) *\/$/;"	e	enum:__anon14
+TRANSMIT_INCOMPLETE	z_my_work/threads.h	/^    TRANSMIT_INCOMPLETE, \/** More data remaining to write. *\/$/;"	e	enum:__anon14
 TestFailures	libcJSON/tests/unity/src/unity_internals.h	/^    UNITY_COUNTER_TYPE TestFailures;$/;"	m	struct:UNITY_STORAGE_T
 TestFile	libcJSON/tests/unity/src/unity_internals.h	/^    const char* TestFile;$/;"	m	struct:UNITY_STORAGE_T
 TestFileFilter	libcJSON/tests/unity/auto/test_file_filter.rb	/^  class TestFileFilter$/;"	c	class:RakefileHelpers
@@ -1341,7 +1343,7 @@ assert_print_number	libcJSON/tests/print_number.c	/^static void assert_print_num
 assert_print_object	libcJSON/tests/print_object.c	/^static void assert_print_object(const char * const expected, const char * const input)$/;"	f	file:
 assert_print_string	libcJSON/tests/print_string.c	/^static void assert_print_string(const char *expected, const char *input)$/;"	f	file:
 assert_print_value	libcJSON/tests/print_value.c	/^static void assert_print_value(const char *input)$/;"	f	file:
-base	z_my_work/threads.h	/^    struct event_base *base;    \/* libevent handle this thread uses *\/$/;"	m	struct:__anon15	typeref:struct:__anon15::event_base
+base	z_my_work/threads.h	/^    struct event_base *base;    \/* libevent handle this thread uses *\/$/;"	m	struct:__anon16	typeref:struct:__anon16::event_base
 boolean	libcJSON/cJSON.h	/^CJSON_PUBLIC(cJSON *) cJSON_CreateBool(cJSON_bool boolean);$/;"	v
 buffer	libcJSON/cJSON.c	/^    unsigned char *buffer;$/;"	m	struct:__anon3	file:
 buffer	libcJSON/tests/unity/extras/fixture/test/unity_output_Spy.c	/^static char* buffer;$/;"	v	file:
@@ -1551,8 +1553,9 @@ conn_free	z_my_work/threads.c	/^void conn_free(conn_t *c) $/;"	f
 conn_init	z_my_work/threads.c	/^static void conn_init(void) $/;"	f	file:
 conn_listening	z_my_work/threads.h	/^    conn_listening,  \/**< the socket which listens for connections *\/$/;"	e	enum:__anon12
 conn_max_state	z_my_work/threads.h	/^    conn_max_state   \/**< Max state value (used for assertion) *\/$/;"	e	enum:__anon12
-conn_mwrite	z_my_work/threads.h	/^    conn_mwrite,     \/**< writing out many items sequentially *\/$/;"	e	enum:__anon12
+conn_mwrite	z_my_work/threads.h	/^	conn_mwrite,     \/**< writing out many items sequentially *\/$/;"	e	enum:__anon13
 conn_new	z_my_work/threads.c	/^conn_t *conn_new(const int sfd, conn_states_e init_state,$/;"	f
+conn_nowrite	z_my_work/threads.h	/^	conn_nowrite,$/;"	e	enum:__anon13
 conn_parse_cmd	z_my_work/threads.h	/^    conn_parse_cmd,  \/**< try to parse a command from the input buffer *\/$/;"	e	enum:__anon12
 conn_queue_item_s	z_my_work/threads.h	/^typedef struct conn_queue_item_s$/;"	s
 conn_queue_item_t	z_my_work/threads.h	/^}conn_queue_item_t;$/;"	t	typeref:struct:conn_queue_item_s
@@ -1563,7 +1566,9 @@ conn_s	z_my_work/threads.h	/^typedef struct conn_s$/;"	s
 conn_set_state	z_my_work/threads.c	/^static void conn_set_state(conn_t *c, conn_states_e state) $/;"	f	file:
 conn_states_e	z_my_work/threads.h	/^}conn_states_e;$/;"	t	typeref:enum:__anon12
 conn_t	z_my_work/threads.h	/^}conn_t;$/;"	t	typeref:struct:conn_s
-conn_write	z_my_work/threads.h	/^    conn_write,      \/**< writing out a simple response *\/$/;"	e	enum:__anon12
+conn_wclosing	z_my_work/threads.h	/^    conn_wclosing,    \/**< closing this connection *\/$/;"	e	enum:__anon13
+conn_write	z_my_work/threads.h	/^    conn_write,      \/**< writing out a simple response *\/$/;"	e	enum:__anon13
+conn_wstates_e	z_my_work/threads.h	/^}conn_wstates_e;$/;"	t	typeref:enum:__anon13
 conns	z_my_work/threads.c	/^conn_t **conns = NULL;$/;"	v
 content	libcJSON/cJSON.c	/^    const unsigned char *content;$/;"	m	struct:__anon2	file:
 count	libcJSON/tests/unity/extras/fixture/test/unity_output_Spy.c	/^static int count;$/;"	v	file:
@@ -1648,8 +1653,9 @@ ev_flags	z_my_work/threads.h	/^    short  ev_flags;$/;"	m	struct:conn_s
 event	z_my_work/threads.h	/^    struct event event;$/;"	m	struct:conn_s	typeref:struct:conn_s::event
 event_flags	z_my_work/threads.h	/^    int               		event_flags;$/;"	m	struct:conn_queue_item_s
 event_handler	z_my_work/threads.c	/^void event_handler(const int fd, const short which, void *arg) $/;"	f
-eventbase_add_wevent	z_my_work/threads.c	/^void eventbase_add_wevent(conn_t *c,int simple_write)$/;"	f
+eventbase_add_wevent	z_my_work/threads.c	/^void eventbase_add_wevent(conn_t *c)$/;"	f
 eventbase_add_write_data	z_my_work/threads.c	/^int eventbase_add_write_data(conn_t *c, const void *buf, int len) $/;"	f
+eventbase_copy_write_date	z_my_work/threads.c	/^int eventbase_copy_write_date(conn_t *c , void *buf, int len)$/;"	f
 eventbase_data_init	z_my_work/threads.c	/^int eventbase_data_init()$/;"	f
 eventbase_delete_wevent	z_my_work/threads.c	/^void eventbase_delete_wevent(conn_t *c)$/;"	f
 eventbase_thread_init	z_my_work/threads.c	/^void eventbase_thread_init(int nthreads) $/;"	f
@@ -1672,7 +1678,7 @@ failing_malloc	libcJSON/tests/cjson_add.c	/^static void * CJSON_CDECL failing_ma
 failing_realloc	libcJSON/tests/misc_tests.c	/^static void * CJSON_CDECL failing_realloc(void *pointer, size_t size)$/;"	f	file:
 false	libcJSON/cJSON.c	62;"	d	file:
 false	libcJSON/cJSON_Utils.c	54;"	d	file:
-false	z_my_work/threads.h	39;"	d
+false	z_my_work/threads.h	44;"	d
 file_test10_should_be_parsed_and_printed	libcJSON/tests/parse_examples.c	/^static void file_test10_should_be_parsed_and_printed(void)$/;"	f	file:
 file_test11_should_be_parsed_and_printed	libcJSON/tests/parse_examples.c	/^static void file_test11_should_be_parsed_and_printed(void)$/;"	f	file:
 file_test1_should_be_parsed_and_printed	libcJSON/tests/parse_examples.c	/^static void file_test1_should_be_parsed_and_printed(void)$/;"	f	file:
@@ -1816,7 +1822,7 @@ load_configuration	libcJSON/tests/unity/extras/fixture/rakefile_helper.rb	/^  de
 load_configuration	libcJSON/tests/unity/test/rakefile_helper.rb	/^  def load_configuration(config_file)$/;"	f	class:RakefileHelpers
 local_include_dirs	libcJSON/tests/unity/examples/example_3/rakefile_helper.rb	/^  def local_include_dirs$/;"	f	class:RakefileHelpers
 local_include_dirs	libcJSON/tests/unity/test/rakefile_helper.rb	/^  def local_include_dirs$/;"	f	class:RakefileHelpers
-local_transport	z_my_work/threads.h	/^    local_transport, \/* Unix sockets*\/$/;"	e	enum:__anon14
+local_transport	z_my_work/threads.h	/^    local_transport, \/* Unix sockets*\/$/;"	e	enum:__anon15
 lock	z_my_work/threads.h	/^    pthread_mutex_t lock;$/;"	m	struct:conn_queue_s
 lon	libcJSON/test.c	/^    double lon;$/;"	m	struct:record	file:
 main	libcJSON/fuzzing/afl.c	/^int main(int argc, char** argv)$/;"	f
@@ -1894,17 +1900,17 @@ multiple	libcJSON/tests/unity/extras/fixture/test/unity_fixture_Test.c	/^static 
 mygroup	libcJSON/tests/unity/extras/fixture/test/template_fixture_tests.c	/^TEST_GROUP(mygroup);$/;"	v
 n	libiniparser/dictionary.h	/^    int             n ;     \/** Number of entries in dictionary *\/$/;"	m	struct:_dictionary_
 name	libcJSON/tests/unity/extras/fixture/test/unity_fixture_Test.c	/^static const char* name[] = {$/;"	v	file:
-network_transport_e	z_my_work/threads.h	/^}network_transport_e;$/;"	t	typeref:enum:__anon14
-new_conn_queue	z_my_work/threads.h	/^    conn_queue_t *new_conn_queue; \/* queue of new connections to handle *\/$/;"	m	struct:__anon15
+network_transport_e	z_my_work/threads.h	/^}network_transport_e;$/;"	t	typeref:enum:__anon15
+new_conn_queue	z_my_work/threads.h	/^    conn_queue_t *new_conn_queue; \/* queue of new connections to handle *\/$/;"	m	struct:__anon16
 next	libcJSON/cJSON.h	/^    struct cJSON *next;$/;"	m	struct:cJSON	typeref:struct:cJSON::cJSON
 next	z_my_work/threads.h	/^    struct conn_queue_item_s          		*next;$/;"	m	struct:conn_queue_item_s	typeref:struct:conn_queue_item_s::conn_queue_item_s
 next	z_my_work/threads.h	/^    struct conn_s   *next;     \/* Used for generating a list of conn structures *\/$/;"	m	struct:conn_s	typeref:struct:conn_s::conn_s
 noOptions	libcJSON/tests/unity/extras/fixture/test/unity_fixture_Test.c	/^static const char* noOptions[] = {$/;"	v	file:
 noalloc	libcJSON/cJSON.c	/^    cJSON_bool noalloc;$/;"	m	struct:__anon3	file:
 normal_free	libcJSON/tests/cjson_add.c	/^static void CJSON_CDECL normal_free(void *pointer)$/;"	f	file:
-notify_event	z_my_work/threads.h	/^    struct event notify_event;  \/* listen event for notify pipe *\/$/;"	m	struct:__anon15	typeref:struct:__anon15::event
-notify_receive_fd	z_my_work/threads.h	/^    int notify_receive_fd;      \/* receiving end of notify pipe *\/$/;"	m	struct:__anon15
-notify_send_fd	z_my_work/threads.h	/^    int notify_send_fd;         \/* sending end of notify pipe *\/$/;"	m	struct:__anon15
+notify_event	z_my_work/threads.h	/^    struct event notify_event;  \/* listen event for notify pipe *\/$/;"	m	struct:__anon16	typeref:struct:__anon16::event
+notify_receive_fd	z_my_work/threads.h	/^    int notify_receive_fd;      \/* receiving end of notify pipe *\/$/;"	m	struct:__anon16
+notify_send_fd	z_my_work/threads.h	/^    int notify_send_fd;         \/* sending end of notify pipe *\/$/;"	m	struct:__anon16
 num_work_threads	z_my_work/server_setting.h	/^	int num_work_threads;$/;"	m	struct:__anon10
 object	libcJSON/cJSON_Utils.h	/^CJSON_PUBLIC(void) cJSONUtils_SortObject(cJSON * const object);$/;"	v
 object	libcJSON/cJSON_Utils.h	/^CJSON_PUBLIC(void) cJSONUtils_SortObjectCaseSensitive(cJSON * const object);$/;"	v
@@ -1946,7 +1952,7 @@ parse_object_should_not_parse_non_objects	libcJSON/tests/parse_object.c	/^static
 parse_object_should_parse_empty_objects	libcJSON/tests/parse_object.c	/^static void parse_object_should_parse_empty_objects(void)$/;"	f	file:
 parse_object_should_parse_objects_with_multiple_elements	libcJSON/tests/parse_object.c	/^static void parse_object_should_parse_objects_with_multiple_elements(void)$/;"	f	file:
 parse_object_should_parse_objects_with_one_element	libcJSON/tests/parse_object.c	/^static void parse_object_should_parse_objects_with_one_element(void)$/;"	f	file:
-parse_status_e	z_my_work/cmd_parse.h	/^}parse_status_e;$/;"	t	typeref:enum:__anon16
+parse_status_e	z_my_work/cmd_parse.h	/^}parse_status_e;$/;"	t	typeref:enum:__anon17
 parse_string	libcJSON/cJSON.c	/^static cJSON_bool parse_string(cJSON * const item, parse_buffer * const input_buffer)$/;"	f	file:
 parse_string_should_not_overflow_with_closing_backslash	libcJSON/tests/parse_string.c	/^static void parse_string_should_not_overflow_with_closing_backslash(void)$/;"	f	file:
 parse_string_should_not_parse_invalid_backslash	libcJSON/tests/parse_string.c	/^static void parse_string_should_not_parse_invalid_backslash(void)$/;"	f	file:
@@ -2017,7 +2023,7 @@ print_value_should_print_string	libcJSON/tests/print_value.c	/^static void print
 print_value_should_print_true	libcJSON/tests/print_value.c	/^static void print_value_should_print_true(void)$/;"	f	file:
 printbuffer	libcJSON/cJSON.c	/^} printbuffer;$/;"	t	typeref:struct:__anon3	file:
 process	libcJSON/tests/unity/auto/parse_output.rb	/^  def process(name)$/;"	f
-protocol_parse	z_my_work/cmd_parse.c	/^parse_status_e protocol_parse(conn_t * c)$/;"	f
+protocol_parse	z_my_work/cmd_parse.c	/^parse_status_e protocol_parse(conn_t * c,int *parsed_len)$/;"	f
 putcharSpy	libcJSON/tests/unity/test/testdata/testRunnerGenerator.c	/^void putcharSpy(int c) { (void)putchar(c);} \/\/ include passthrough for linking tests$/;"	f
 putcharSpy	libcJSON/tests/unity/test/testdata/testRunnerGeneratorSmall.c	/^void putcharSpy(int c) { (void)putchar(c);} \/\/ include passthrough for linking tests$/;"	f
 putcharSpy	libcJSON/tests/unity/test/testdata/testRunnerGeneratorWithMocks.c	/^void putcharSpy(int c) { (void)putchar(c);} \/\/ include passthrough for linking tests$/;"	f
@@ -2179,7 +2185,7 @@ tackit	libcJSON/tests/unity/extras/fixture/rakefile_helper.rb	/^  def tackit(str
 tackit	libcJSON/tests/unity/test/rakefile_helper.rb	/^  def tackit(strings)$/;"	f	class:RakefileHelpers
 tail	z_my_work/threads.h	/^    conn_queue_item_t *tail;$/;"	m	struct:conn_queue_s
 targets	libcJSON/tests/unity/auto/unity_test_summary.py	/^    targets = list(map(lambda x: x.replace('\\\\', '\/'), glob(targets_dir + '*.test*')))$/;"	v	class:UnityTestSummary
-tcp_transport	z_my_work/threads.h	/^    tcp_transport,$/;"	e	enum:__anon14
+tcp_transport	z_my_work/threads.h	/^    tcp_transport,$/;"	e	enum:__anon15
 tearDown	libcJSON/tests/unity/examples/example_1/test/TestProductionCode.c	/^void tearDown(void)$/;"	f
 tearDown	libcJSON/tests/unity/examples/example_1/test/TestProductionCode2.c	/^void tearDown(void)$/;"	f
 tearDown	libcJSON/tests/unity/examples/example_3/test/TestProductionCode.c	/^void tearDown(void)$/;"	f
@@ -2700,25 +2706,26 @@ test_passed	libcJSON/tests/unity/auto/parse_output.rb	/^  def test_passed(array)
 test_passed_unity_fixture	libcJSON/tests/unity/auto/parse_output.rb	/^  def test_passed_unity_fixture(array)$/;"	f	class:ParseOutput
 test_suite_verify	libcJSON/tests/unity/auto/parse_output.rb	/^  def test_suite_verify(test_suite_name)$/;"	f	class:ParseOutput
 thread	z_my_work/threads.h	/^    EVENT_THREAD *thread; \/* Pointer to the thread object serving this connection *\/$/;"	m	struct:conn_s
-thread_id	z_my_work/threads.h	/^    pthread_t thread_id;        \/* unique ID of this thread *\/$/;"	m	struct:__anon15
+thread_id	z_my_work/threads.h	/^    pthread_t thread_id;        \/* unique ID of this thread *\/$/;"	m	struct:__anon16
 thread_libevent_process	z_my_work/threads.c	/^static void thread_libevent_process(int fd, short which, void *arg) $/;"	f	file:
 threads	z_my_work/threads.c	/^static EVENT_THREAD *threads = NULL;$/;"	v	file:
 time_func	libevent/sample.c	/^void time_func(evutil_socket_t fd, short flags, void *arg)$/;"	f
 touch_src	libcJSON/tests/unity/test/spec/generate_module_existing_file_spec.rb	/^def touch_src(file)$/;"	f
 touch_test	libcJSON/tests/unity/test/spec/generate_module_existing_file_spec.rb	/^def touch_test(file)$/;"	f
-transmit_result_e	z_my_work/threads.h	/^}transmit_result_e;$/;"	t	typeref:enum:__anon13
+transmit_result_e	z_my_work/threads.h	/^}transmit_result_e;$/;"	t	typeref:enum:__anon14
 transport	z_my_work/threads.h	/^    network_transport_e  transport;$/;"	m	struct:conn_queue_item_s
 transport	z_my_work/threads.h	/^    network_transport_e transport; \/* what transport is used by this connection *\/$/;"	m	struct:conn_s
 true	libcJSON/cJSON.c	61;"	d	file:
 true	libcJSON/cJSON_Utils.c	53;"	d	file:
-true	z_my_work/threads.h	36;"	d
+true	z_my_work/threads.h	41;"	d
 try_read_network	z_my_work/threads.c	/^read_status_e try_read_network(conn_t *c) $/;"	f
 try_read_udp	z_my_work/threads.c	/^read_status_e try_read_udp(conn_t *c)$/;"	f
 try_send_data	z_my_work/threads.c	/^transmit_result_e try_send_data(conn_t *c) $/;"	f
+try_send_mdata	z_my_work/threads.c	/^transmit_result_e try_send_mdata(conn_t *c) $/;"	f
 type	libcJSON/cJSON.h	/^    int type;$/;"	m	struct:cJSON
 type	z_my_work/server_setting.h	/^	value_type_e type;$/;"	m	struct:__anon9
 typecheck_functions_should_check_type	libcJSON/tests/misc_tests.c	/^static void typecheck_functions_should_check_type(void)$/;"	f	file:
-udp_transport	z_my_work/threads.h	/^    udp_transport$/;"	e	enum:__anon14
+udp_transport	z_my_work/threads.h	/^    udp_transport$/;"	e	enum:__anon15
 unit_test_files	libcJSON/tests/unity/examples/example_3/rakefile_helper.rb	/^  def unit_test_files$/;"	f	class:RakefileHelpers
 unit_test_files	libcJSON/tests/unity/test/rakefile_helper.rb	/^  def unit_test_files$/;"	f	class:RakefileHelpers
 unity_calloc	libcJSON/tests/unity/extras/fixture/src/unity_fixture.c	/^void* unity_calloc(size_t num, size_t size)$/;"	f
@@ -2733,6 +2740,7 @@ usage	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def usage(err_msg = nil)
 usage	libcJSON/tests/unity/auto/unity_test_summary.py	/^    def usage(self, err_msg=None):$/;"	m	class:UnityTestSummary
 usage	libcJSON/tests/unity/auto/unity_test_summary.rb	/^  def usage(err_msg = nil)$/;"	f	class:UnityTestSummary
 usage	libcJSON/tests/unity/auto/unity_to_junit.py	/^    def usage(err_msg=None):$/;"	m	class:UnityTestSummary
+user_data	z_my_work/threads.h	/^	void *user_data;$/;"	m	struct:conn_s
 utf16_literal_to_utf8	libcJSON/cJSON.c	/^static unsigned char utf16_literal_to_utf8(const unsigned char * const input_pointer, const unsigned char * const input_end, unsigned char **output_pointer)$/;"	f	file:
 uts	libcJSON/tests/unity/auto/unity_test_summary.py	/^  uts = UnityTestSummary()$/;"	v	class:UnityTestSummary
 uts	libcJSON/tests/unity/auto/unity_to_junit.py	/^    uts = UnityTestSummary()$/;"	v
@@ -2752,9 +2760,9 @@ which	z_my_work/threads.h	/^    short  which;   \/** which events were just trig
 win32_colour	libcJSON/tests/unity/auto/colour_prompt.rb	/^  def win32_colour(colour)$/;"	f	class:ColourCommandLine
 worker_libevent	z_my_work/threads.c	/^static void *worker_libevent(void *arg) $/;"	f	file:
 write_and_free	z_my_work/threads.h	/^    void   *write_and_free; \/** free this memory after finishing writing *\/$/;"	m	struct:conn_s
-write_and_go	z_my_work/threads.h	/^    conn_states_e  write_and_go;$/;"	m	struct:conn_s
 write_failures	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def write_failures(results, stream)$/;"	f
 write_ignored	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def write_ignored(results, stream)$/;"	f
+write_machine	z_my_work/threads.c	/^void write_machine(conn_t *c)$/;"	f
 write_suite_footer	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def write_suite_footer(stream)$/;"	f
 write_suite_header	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def write_suite_header(counts, stream)$/;"	f
 write_suites_footer	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def write_suites_footer(stream)$/;"	f
@@ -2763,6 +2771,7 @@ write_tests	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def write_tests(re
 write_xml_header	libcJSON/tests/unity/auto/stylize_as_junit.rb	/^  def write_xml_header(stream)$/;"	f
 write_xml_output	libcJSON/tests/unity/auto/parse_output.rb	/^  def write_xml_output$/;"	f	class:ParseOutput
 wsize	z_my_work/threads.h	/^    int    wsize;$/;"	m	struct:conn_s
+wstate	z_my_work/threads.h	/^	conn_wstates_e  wstate;$/;"	m	struct:conn_s
 xstrdup	libiniparser/dictionary.c	/^static char * xstrdup(const char * s)$/;"	f	file:
 xstrdup	libiniparser/iniparser.c	/^static char * xstrdup(const char * s)$/;"	f	file:
 zip	libcJSON/test.c	/^    const char *zip;$/;"	m	struct:record	file:

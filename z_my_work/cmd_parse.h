@@ -19,11 +19,12 @@ typedef enum
 {
 	/*normal case.*/
 	PARSE_DONE,
+	PARSE_DONE_NEED_WRITE,
 	/*fatal error .need close this client*/
-	PARSE_ERROR,
+	PARSE_ERROR
 	
 }parse_status_e;
-parse_status_e protocol_parse(conn_t * c);
+parse_status_e protocol_parse(conn_t * c,int *parsed_len);
 
 
 

@@ -32,6 +32,11 @@ extern "C"
 #define UDP_MAX_PAYLOAD_SIZE 1400
 
 
+#ifndef IOV_MAX
+#define IOV_MAX 1024
+#endif
+
+
 #ifndef true
 #define true 1
 #endif
@@ -56,12 +61,17 @@ typedef enum
     conn_listening,  /**< the socket which listens for connections */
     conn_read,       /**< reading in a command line */
     conn_parse_cmd,  /**< try to parse a command from the input buffer */
-    conn_write,      /**< writing out a simple response */
     conn_closing,    /**< closing this connection */
-    conn_mwrite,     /**< writing out many items sequentially */
     conn_closed,     /**< connection is closed */
     conn_max_state   /**< Max state value (used for assertion) */
 }conn_states_e;
+typedef enum
+{
+	conn_nowrite,
+    conn_write,      /**< writing out a simple response */
+	conn_mwrite,     /**< writing out many items sequentially */
+    conn_wclosing,    /**< closing this connection */
+}conn_wstates_e;
 
 typedef enum 
 {
@@ -114,6 +124,7 @@ typedef struct conn_s
 {
     int    sfd;
     conn_states_e  state;
+	conn_wstates_e  wstate;
 	read_status_e read_state;
     unsigned int last_cmd_time;
 	/*event for read*/
@@ -132,8 +143,7 @@ typedef struct conn_s
     char   *wcurr;
     int    wsize;
     int    wbytes;
-    /** which state to go into after finishing current write */
-    conn_states_e  write_and_go;
+    
     void   *write_and_free; /** free this memory after finishing writing */
 
 
@@ -157,6 +167,8 @@ typedef struct conn_s
  
     struct conn_s   *next;     /* Used for generating a list of conn structures */
     EVENT_THREAD *thread; /* Pointer to the thread object serving this connection */
+
+	void *user_data;
 }conn_t;
 
 

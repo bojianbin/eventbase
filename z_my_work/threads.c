@@ -189,6 +189,9 @@ void conn_free(conn_t *c)
     }
 }
 void event_handler(const int fd, const short which, void *arg) ;
+void event_whandler(const int fd, const short which, void *arg) ;
+
+static int add_msghdr(conn_t *c);
 conn_t *conn_new(const int sfd, conn_states_e init_state,
                 const int event_flags,
                 const int read_buffer_size, network_transport_e transport,
@@ -268,6 +271,8 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
         return NULL;
     }
 
+	add_msghdr(c);
+
     return c;
 }
 
@@ -283,6 +288,14 @@ static void conn_set_state(conn_t *c, conn_states_e state)
         c->state = state;
     }
 }
+static void conn_set_wstate(conn_t *c, conn_wstates_e state) 
+{
+    if (state != c->wstate) 
+	{
+        c->wstate = state;
+    }
+}
+
 static void conn_cleanup(conn_t *c) 
 {
     if(c == NULL)
@@ -349,7 +362,7 @@ void dispatch_conn_new(int sfd, conn_states_e init_state, int event_flags,
     item->transport = transport;
 
     cq_push(thread->new_conn_queue, item);
-
+	printf("dispatch %d\n",last_thread);
     buf[0] = 'c';
     if (write(thread->notify_send_fd, buf, 1) != 1) 
 	{
@@ -513,6 +526,46 @@ static int add_msghdr(conn_t *c)
     return 0;
 }
 
+int  conn_msg_reset(conn_t *c)
+{
+	int ret = 0;
+	if(c == NULL) return -1;
+
+	
+    if (c->msgsize > MSG_LIST_MAX) 
+	{
+        struct msghdr *newbuf = (struct msghdr *) realloc((void *)c->msglist, MSG_LIST_INITIAL * sizeof(c->msglist[0]));
+        if (newbuf) 
+		{
+            c->msglist = newbuf;
+            c->msgsize = MSG_LIST_INITIAL;
+        }else
+        {
+        	return -1;
+        }
+    }
+
+    if (c->iovsize > IOV_LIST_MAX) 
+	{
+        struct iovec *newbuf = (struct iovec *) realloc((void *)c->iov, IOV_LIST_INITIAL * sizeof(c->iov[0]));
+        if (newbuf) 
+		{
+            c->iov = newbuf;
+            c->iovsize = IOV_LIST_INITIAL;
+        }else
+        {
+        	return -1;
+        }
+    }
+
+	c->iovused = 0;
+    c->msgcurr = 0;
+    c->msgused = 0;
+	c->msgbytes = 0;
+
+	return add_msghdr(c);
+	
+}
 int eventbase_copy_write_date(conn_t *c , void *buf, int len)
 {
 	if(!c || !buf || len <= 0 || len > c->wsize - c->wbytes)
@@ -626,8 +679,11 @@ transmit_result_e try_send_data(conn_t *c)
 
 	if(data_line_num)
 	{
-		ret = send(c->sfd,c->wcurr,data_line_num);
-		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGIN))
+		if(c->transport == udp_transport)
+			ret = sendto(c->sfd,c->wcurr,data_line_num,0,(struct sockaddr *)&(c->request_addr),c->request_addr_size);
+		else
+			ret = send(c->sfd,c->wcurr,data_line_num,0);
+		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGAIN))
 		{
 			return TRANSMIT_COMPLETE;
 		}else if(ret > 0)
@@ -636,7 +692,7 @@ transmit_result_e try_send_data(conn_t *c)
 			c->wbytes -= ret ;
 			if(ret != data_line_num)
 			{
-				return TRANSMIT_COMPLETE
+				return TRANSMIT_COMPLETE;
 			}
 		}else
 		{
@@ -646,8 +702,11 @@ transmit_result_e try_send_data(conn_t *c)
 	if(data_line2_num)
 	{
 		c->wcurr = c->wbuf;
-		ret = send(c->sfd,c->wcurr,data_line2_num);
-		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGIN))
+		if(c->transport == udp_transport)
+			ret = sendto(c->sfd,c->wcurr,data_line2_num,0,(struct sockaddr *)&(c->request_addr),c->request_addr_size);
+		else
+			ret = send(c->sfd,c->wcurr,data_line2_num,0);
+		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGAIN))
 		{
 			return TRANSMIT_COMPLETE;
 		}else if(ret > 0)
@@ -656,7 +715,7 @@ transmit_result_e try_send_data(conn_t *c)
 			c->wbytes -= ret ;
 			if(ret != data_line2_num)
 			{
-				return TRANSMIT_COMPLETE
+				return TRANSMIT_COMPLETE;
 			}
 		}else
 		{
@@ -717,6 +776,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 		c->msgcurr++;
  	}
 }
+
 void eventbase_add_wevent(conn_t *c)
 {
 	if(c->wstate != conn_nowrite)
@@ -728,7 +788,7 @@ void eventbase_add_wevent(conn_t *c)
 
 
 	event_assign(&c->wevent, c->thread->base, c->sfd, EV_WRITE | EV_PERSIST , 
-		event_handler, c);
+		event_whandler, c);
 	event_add(&c->wevent,NULL);
 }
 void eventbase_delete_wevent(conn_t *c)
@@ -736,15 +796,14 @@ void eventbase_delete_wevent(conn_t *c)
 	if(c->wstate == conn_nowrite)
 		return;
 	
-	c->wstate = conn_nowrite;
+	
 	switch(c->wstate)
 	{
-		case conn_nowrite:
-			return;
 		case conn_write:
 			c->wstate = conn_mwrite;
 			return;
 		case conn_mwrite:
+			c->wstate = conn_nowrite;
 			event_del(&c->wevent);
 			break;
 	}
@@ -789,7 +848,7 @@ void drive_machine(conn_t *c)
 	                }
 	                break;
 	            }
-	           
+	           	printf("accept:%d\n",sfd);
 				anetNonBlock(NULL, sfd);
 
 	            if (sfd >= g_setting.max_connections - 1) 
@@ -805,10 +864,12 @@ void drive_machine(conn_t *c)
 				break;
 				
 			case conn_read:
+				
 				if(c->transport == udp_transport)
 					read_ret = try_read_udp(c);
 				else
 					read_ret = try_read_network(c);
+				printf("read %d\n",read_ret);
 				c->read_state = read_ret;
 				switch (read_ret) 
 				{
@@ -827,7 +888,8 @@ void drive_machine(conn_t *c)
 				break;
 			case conn_parse_cmd:
 				parse_len = 0;
-				parse_ret = protocol_parse(c,&parse_len);
+				parse_ret = protocol_parse(c,c->rcurr,c->rbytes,&parse_len);
+				printf("parse:%d  %d\n",parse_ret,parse_len);
 				if(parse_len < 0 || parse_len > c->rsize)
 				{/*value parse_len illegal*/
 					conn_set_state(c, conn_closing);
@@ -881,6 +943,7 @@ void drive_machine(conn_t *c)
 }
 void write_machine(conn_t *c)
 {
+	int ret;
 	int stop = false;
 	
 	while(stop == false)
@@ -904,7 +967,7 @@ void write_machine(conn_t *c)
 							eventbase_delete_wevent(c);
 						}else
 						{
-							conn_set_state(c, conn_wclosing);
+							conn_set_wstate(c, conn_wclosing);
 						}
 				}
 				break;
@@ -914,6 +977,12 @@ void write_machine(conn_t *c)
 				{
 					case TRANSMIT_COMPLETE:
 						eventbase_delete_wevent(c);
+						ret = conn_msg_reset(c);
+						if(ret < 0)
+						{
+							conn_set_wstate(c, conn_wclosing);
+							break;
+						}
 						stop = true;
 						break;
 
@@ -926,7 +995,7 @@ void write_machine(conn_t *c)
 							eventbase_delete_wevent(c);
 						}else
 						{
-							conn_set_state(c, conn_wclosing);
+							conn_set_wstate(c, conn_wclosing);
 						}
 				}
 				break;
@@ -939,6 +1008,26 @@ void write_machine(conn_t *c)
 		        break;
 		}
 	}
+}
+void event_whandler(const int fd, const short which, void *arg) 
+{
+	conn_t *c;
+
+    c = (conn_t *)arg;
+
+    c->which = which;
+
+    /* sanity */
+    if (fd != c->sfd) 
+	{
+        conn_close(c);
+        return;
+    }
+
+    write_machine(c);
+	
+    /* wait for next event */
+    return;
 }
 
 void event_handler(const int fd, const short which, void *arg) 
@@ -957,7 +1046,7 @@ void event_handler(const int fd, const short which, void *arg)
     }
 
     drive_machine(c);
-
+	
     /* wait for next event */
     return;
 }
@@ -975,6 +1064,7 @@ static void thread_libevent_process(int fd, short which, void *arg)
     conn_t *c;
     unsigned int timeout_fd;
 
+	printf("bojianbin:thread_libevent_process \n");
     while(read(fd, buf, 1) == 1) 
 	{
 	    switch (buf[0]) 
@@ -1055,7 +1145,7 @@ static void *worker_libevent(void *arg)
 	char thread_name[32] = {0};
     EVENT_THREAD *me = arg;
 
-	sprintf(thread_name,"event_%d",me - threads + 1);
+	sprintf(thread_name,"event_%ld",me - threads + 1);
 	prctl(PR_SET_NAME,thread_name);
 	
     event_base_dispatch(me->base);
@@ -1145,6 +1235,7 @@ int server_socket_init(int port,struct event_base *main_base)
 	tcp_fd = anetTcpServer(NULL, port, NULL , 100);
 	if(tcp_fd < 0) 
 		goto ERR;
+	printf("server:%d\n",tcp_fd);
 	anetNonBlock(NULL, tcp_fd);
 	
 	udp_fd = anetUdpServer(NULL, port, NULL);

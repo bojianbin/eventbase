@@ -24,7 +24,8 @@ typedef enum
 	PARSE_ERROR
 	
 }parse_status_e;
-parse_status_e protocol_parse(conn_t * c,int *parsed_len);
+
+parse_status_e protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_len);
 
 
 

@@ -23,10 +23,11 @@ extern "C"
 #define DATA_BUFFER_SIZE 2048
 
 /** Initial size of the sendmsg() scatter/gather array. */
-#define IOV_LIST_INITIAL 400
-
+#define IOV_LIST_INITIAL 100
+#define IOV_LIST_MAX 200
 /** Initial number of sendmsg() argument structures to allocate. */
 #define MSG_LIST_INITIAL 10
+#define MSG_LIST_MAX 20
 
 #define UDP_READ_BUFFER_SIZE 65536
 #define UDP_MAX_PAYLOAD_SIZE 1400
@@ -176,6 +177,9 @@ typedef struct conn_s
 int eventbase_data_init();
 int server_socket_init(int port,struct event_base *main_base);
 void eventbase_thread_init(int nthreads) ;
+
+int eventbase_copy_write_date(conn_t *c , void *buf, int len);
+int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
 
 #ifdef __cplusplus
 }

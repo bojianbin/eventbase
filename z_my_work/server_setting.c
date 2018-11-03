@@ -27,7 +27,7 @@ void setting_init(server_setting_t *setting)
 	setting->num_work_threads = 3;
 	setting->server_port = 6737;
 
-	setting->max_user_rbuf = 4096;
+	setting->max_user_rbuf = 5120;
 	return;
 }
 int setting_read(server_setting_t *setting)

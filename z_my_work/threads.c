@@ -25,6 +25,7 @@ static conn_queue_item_t *cqi_freelist = NULL;
 static pthread_mutex_t cqi_freelist_lock = PTHREAD_MUTEX_INITIALIZER;
 volatile unsigned int current_time = 0;
 static conn_t *listen_conn = NULL;
+static struct event clockevent;
 
 
 
@@ -243,8 +244,8 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
     if (transport == tcp_transport ) 
 	{
         if (getpeername(sfd, (struct sockaddr *) &c->request_addr,
-                        &c->request_addr_size)) {
-            perror("getpeername");
+                        &c->request_addr_size)) 
+       	{
             memset(&c->request_addr, 0, sizeof(c->request_addr));
         }
     }
@@ -257,10 +258,6 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
     c->msgcurr = 0;
     c->msgused = 0;
     c->last_cmd_time = current_time; /* initialize for idle kicker */
-
-
-    c->write_and_free = 0;
-
 
     event_assign(&c->event, base,sfd, event_flags, event_handler, (void *)c);
     c->ev_flags = event_flags;
@@ -301,12 +298,6 @@ static void conn_cleanup(conn_t *c)
     if(c == NULL)
 		return;
 
-    if (c->write_and_free) 
-	{
-        free(c->write_and_free);
-        c->write_and_free = 0;
-    }
-
     if (c->transport == udp_transport) 
 	{
         conn_set_state(c, conn_read);
@@ -320,9 +311,12 @@ static void conn_close(conn_t *c)
 
     /* delete the event, the socket and the conn */
     event_del(&c->event);
+	if(c->wstate != conn_nowrite)
+		event_del(&c->wevent);
     conn_cleanup(c);
 
     conn_set_state(c, conn_closed);
+	conn_set_wstate(c, conn_wclosed);
     close(c->sfd);
 
     return;
@@ -362,7 +356,7 @@ void dispatch_conn_new(int sfd, conn_states_e init_state, int event_flags,
     item->transport = transport;
 
     cq_push(thread->new_conn_queue, item);
-	printf("dispatch %d\n",last_thread);
+	
     buf[0] = 'c';
     if (write(thread->notify_send_fd, buf, 1) != 1) 
 	{
@@ -566,6 +560,19 @@ int  conn_msg_reset(conn_t *c)
 	return add_msghdr(c);
 	
 }
+
+/**
+ * copy data to user write buffer 
+ * 
+ * @note: 
+ *		using copy method
+ *
+ * @param[in] c	  		:client structure
+ * @param[in] buf	  	:data buffer addr
+ * @param[in] len	  	:data length
+ *
+ * @return: 0 if success . -1 if error
+ */
 int eventbase_copy_write_date(conn_t *c , void *buf, int len)
 {
 	if(!c || !buf || len <= 0 || len > c->wsize - c->wbytes)
@@ -585,7 +592,18 @@ int eventbase_copy_write_date(conn_t *c , void *buf, int len)
 	c->wbytes += len;	
 	
 }
-
+/**
+ * add data to user write buffer 
+ * 
+ * @note: 
+ *		no copy method. we just register [buf,len] in our conn_t.so don't release them 
+ *
+ * @param[in] c	  		:client structure
+ * @param[in] buf	  	:data buffer addr
+ * @param[in] len	  	:data length
+ *
+ * @return: 0 if success . -1 if error
+ */
 int eventbase_add_write_data(conn_t *c, const void *buf, int len) 
 {
     struct msghdr *m;
@@ -833,7 +851,7 @@ void drive_machine(conn_t *c)
 
 	            if (sfd < 0) 
 				{
-	                perror("accept()");
+	                
 	                if (errno == EAGAIN || errno == EWOULDBLOCK) 
 					{
 	                    /* these are transient, so don't log anything */
@@ -848,7 +866,7 @@ void drive_machine(conn_t *c)
 	                }
 	                break;
 	            }
-	           	printf("accept:%d\n",sfd);
+	           	
 				anetNonBlock(NULL, sfd);
 
 	            if (sfd >= g_setting.max_connections - 1) 
@@ -869,7 +887,7 @@ void drive_machine(conn_t *c)
 					read_ret = try_read_udp(c);
 				else
 					read_ret = try_read_network(c);
-				printf("read %d\n",read_ret);
+				
 				c->read_state = read_ret;
 				switch (read_ret) 
 				{
@@ -889,7 +907,7 @@ void drive_machine(conn_t *c)
 			case conn_parse_cmd:
 				parse_len = 0;
 				parse_ret = protocol_parse(c,c->rcurr,c->rbytes,&parse_len);
-				printf("parse:%d  %d\n",parse_ret,parse_len);
+				
 				if(parse_len < 0 || parse_len > c->rsize)
 				{/*value parse_len illegal*/
 					conn_set_state(c, conn_closing);
@@ -1064,7 +1082,7 @@ static void thread_libevent_process(int fd, short which, void *arg)
     conn_t *c;
     unsigned int timeout_fd;
 
-	printf("bojianbin:thread_libevent_process \n");
+	
     while(read(fd, buf, 1) == 1) 
 	{
 	    switch (buf[0]) 
@@ -1171,7 +1189,49 @@ static void create_worker(void *(*func)(void *), void *arg)
 	return;
 }
 
+/* libevent uses a monotonic clock when available for event scheduling. Aside
+ * from jitter, simply ticking our internal timer here is accurate enough.
+ * Note that users who are setting explicit dates for expiration times *must*
+ * ensure their clocks are correct before starting memcached. */
+static void clock_handler(const int fd, const short which, void *arg) 
+{
+    struct timeval t = {.tv_sec = 1, .tv_usec = 0};
+	struct timespec ts;
+    static int initialized = false;
+    static time_t monotonic_start;
 
+
+    if (initialized) 
+	{
+		//printf("clock_handler %d\n",current_time);
+    } else 
+	{
+		if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1)
+        	return;
+		monotonic_start = ts.tv_sec;
+		event_assign(&clockevent,(struct event_base *)arg,-1,EV_PERSIST, clock_handler, 0);
+    	event_add(&clockevent, &t);
+		initialized = true;
+    }
+
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1)
+        return;
+    current_time = (unsigned int)ts.tv_sec - monotonic_start;
+    return;
+    
+}
+
+
+/**
+ * init structure realated to thread pool .and create the pool
+ * 
+ * @note: 
+ *		process may exit if fatal error we think
+ *
+ * @param[in] nthreads	  :number of threads
+ *
+ * @return: void
+ */
 void eventbase_thread_init(int nthreads) 
 {
     int         i;
@@ -1215,15 +1275,39 @@ void eventbase_thread_init(int nthreads)
 	return;
 }
 
-int eventbase_data_init()
+/**
+ *  init data structure needed
+ * 
+ * @note: 
+ *
+ *
+ * @param[in] void
+ *
+ * @return: 0 if success
+ */
+int eventbase_data_init(struct event_base * main_base)
 {
 
 	conn_init();
+	
+	clock_handler(0,0, main_base) ;
 
 	return 0;
 }
 
-int server_socket_init(int port,struct event_base *main_base)
+/**
+ * init tcp and udp server listen socket.
+ * and dispatch to certain loop
+ * 
+ * @note: 
+ *
+ *
+ * @param[in] port	  		:server port
+ * @param[in] main_base	  	:libevent base structure
+ *
+ * @return: 0 if success . -1 if error
+ */
+int eventbase_server_socket(int port,struct event_base *main_base)
 {
 	int i = 0;
 	int tcp_fd = -1, udp_fd = -1;
@@ -1235,7 +1319,7 @@ int server_socket_init(int port,struct event_base *main_base)
 	tcp_fd = anetTcpServer(NULL, port, NULL , 100);
 	if(tcp_fd < 0) 
 		goto ERR;
-	printf("server:%d\n",tcp_fd);
+	
 	anetNonBlock(NULL, tcp_fd);
 	
 	udp_fd = anetUdpServer(NULL, port, NULL);

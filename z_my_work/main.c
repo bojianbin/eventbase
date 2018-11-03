@@ -31,16 +31,15 @@ int main()
 	sigignore(SIGPIPE);
 	daemonize(0,0);
 	adjust_max_fd(g_setting.max_connections);
-
-	eventbase_data_init();
 	
 	ev_config = event_config_new();
     event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
     main_base = event_base_new_with_config(ev_config);
     event_config_free(ev_config);
-
+	
+	eventbase_data_init(main_base);
 	eventbase_thread_init(g_setting.num_work_threads);
-	ret = server_socket_init(g_setting.server_port,main_base);
+	ret = eventbase_server_socket(g_setting.server_port,main_base);
 	if(ret < 0)
 	{
 		printf("server_socket_init error\n");

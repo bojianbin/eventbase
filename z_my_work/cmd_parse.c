@@ -11,42 +11,34 @@
 #include "cmd_parse.h"
 
 
-/*
- * The memmem() function finds the start of the first occurrence of the
- * substring 'needle' of length 'nlen' in the memory area 'haystack' of
- * length 'hlen'.
+
+void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen);
+
+
+/**
+ * protocol parse .fill write buffer and give feedback 
+ * 
+ * @note: 
+ *		now may have three ways to write data to socket write buffer
+ *     	1:int eventbase_copy_write_date(conn_t *c , void *buf, int len);
+ *		2:int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
+ *		3:handle wbuf,wcurr,wsize,wbytes directly.this can reduse cpu load in some case
+ *		4:change logical model. existing code can not cover all case.espacially mix use method 1 and 2 can 
+ *			cause some problem. this may be fixed later.
  *
- * The return value is a pointer to the beginning of the sub-string, or
- * NULL if the substring is not found.
+ * @param[in] c				:user main structure
+ * @param[in] readbuf		:readbuffer filled with unparsed data
+ * @param[in] totallen		:the unparsed readbuffer length
+ * @param[out] totallen		:readbuf size we parsed this time
+ *
+ * @return:
+ *			PARSE_DONE: 
+ 				we just parse.no need to write.@parsed_len give length we pass through.
+ *			PARSE_DONE_NEED_WRITE:
+ 				we just parse.need to write.@parsed_len give length we pass through.
+ *			PARSE_ERROR:
+ 				some fatal error occurs,need to close this client.
  */
-void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
-{
-    int needle_first;
-    const void *p = haystack;
-    size_t plen = hlen;
-
-    if (!nlen)
-        return NULL;
-
-    needle_first = *(unsigned char *)needle;
-
-    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
-    {
-        if (!memcmp(p, needle, nlen))
-            return (void *)p;
-
-        p++;
-        plen = hlen - (p - haystack);
-    }
-
-    return NULL;
-}
-
-/*
-int eventbase_copy_write_date(conn_t *c , void *buf, int len);
-int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
-
-*/
 parse_status_e protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_len)
 {
 	char *str_find = "hello\r\n";
@@ -71,4 +63,26 @@ END:
 	return retvalue;
 }
 
+void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
+{
+    int needle_first;
+    const void *p = haystack;
+    size_t plen = hlen;
+
+    if (!nlen)
+        return NULL;
+
+    needle_first = *(unsigned char *)needle;
+
+    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
+    {
+        if (!memcmp(p, needle, nlen))
+            return (void *)p;
+
+        p++;
+        plen = hlen - (p - haystack);
+    }
+
+    return NULL;
+}
 

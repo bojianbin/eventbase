@@ -39,7 +39,7 @@ typedef struct
 extern server_setting_t g_setting;
 
 void setting_init(server_setting_t *setting);
-int setting_read(server_setting_t *setting);
+int setting_read();
 int setting_write();
 int daemonize(int _chdir, int close_stdfd);
 int sigignore(int sig);

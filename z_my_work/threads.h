@@ -72,6 +72,7 @@ typedef enum
     conn_write,      /**< writing out a simple response */
 	conn_mwrite,     /**< writing out many items sequentially */
     conn_wclosing,    /**< closing this connection */
+    conn_wclosed
 }conn_wstates_e;
 
 typedef enum 
@@ -144,8 +145,6 @@ typedef struct conn_s
     char   *wcurr;
     int    wsize;
     int    wbytes;
-    
-    void   *write_and_free; /** free this memory after finishing writing */
 
 
     /* data for the mwrite state */
@@ -174,8 +173,8 @@ typedef struct conn_s
 
 
 
-int eventbase_data_init();
-int server_socket_init(int port,struct event_base *main_base);
+int eventbase_data_init(struct event_base * main_base);
+int eventbase_server_socket(int port,struct event_base *main_base);
 void eventbase_thread_init(int nthreads) ;
 
 int eventbase_copy_write_date(conn_t *c , void *buf, int len);

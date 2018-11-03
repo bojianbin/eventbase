@@ -18,6 +18,16 @@ static key_value_t setting_parse[] =
 	{"DETAIL","max_user_rbuf",		&g_setting.max_user_rbuf,		VALUE_INT,	sizeof(g_setting.max_user_rbuf)}
 };
 
+/**
+ *  fill in default params
+ * 
+ * @note: 
+ *
+ *
+ * @param[in] setting	  	:setting structure
+ *
+ * @return: void
+ */
 void setting_init(server_setting_t *setting)
 {
 	if(setting == NULL)
@@ -30,16 +40,24 @@ void setting_init(server_setting_t *setting)
 	setting->max_user_rbuf = 5120;
 	return;
 }
-int setting_read(server_setting_t *setting)
+
+/**
+ *  read and parse params from config file 
+ * 
+ * @note: 
+ *		file name SETTING_CFG_FILE
+ * 		rewrite config file if the config file doesn't cover all params
+ *
+ * @param[in] null
+ *
+ * @return: 0 if success . -1 if error
+ */
+int setting_read()
 {
 	int i = 0, ret = 0;
 	const char * ret_string = NULL;
 	int not_found = 0;
 	char key_buf[512] = {0};
-	
-	
-	if(setting == NULL)
-		return -1;
 
 	
 	dictionary * dict =  iniparser_load(SETTING_CFG_FILE);
@@ -99,6 +117,16 @@ int setting_read(server_setting_t *setting)
 	return 0;
 }
 
+/**
+ *  write setting to config file
+ * 
+ * @note: 
+ *		filename SETTING_CFG_FILE.
+ *
+ * @param[in] null
+ *
+ * @return: 0 if success . -1 if error
+ */
 int setting_write()
 {
 	FILE *fp ;
@@ -163,6 +191,17 @@ int setting_write()
 	return 0;
 }
 
+/**
+ *  daemonize process
+ * 
+ * @note: 
+ *
+ *
+ * @param[in] _chdir	  	:change process current dir "/"
+ * @param[in] close_stdfd	:close fd 0,1 and 2
+ *
+ * @return: 0 if success . -1 if error
+ */
 int daemonize(int _chdir, int close_stdfd)
 {
     int fd;
@@ -212,6 +251,16 @@ int daemonize(int _chdir, int close_stdfd)
     return (0);
 }
 
+/**
+ *  ignore signal 
+ * 
+ * @note: 
+ *
+ *
+ * @param[in] sig	  :signal
+ *
+ * @return: 0 if success . -1 if error
+ */
 int sigignore(int sig) 
 {
     struct sigaction sa = { .sa_handler = SIG_IGN, .sa_flags = 0 };
@@ -222,6 +271,16 @@ int sigignore(int sig)
     return 0;
 }
 
+/**
+ *  Adjust process maximum file descriptor 
+ * 
+ * @note: 
+ *
+ *
+ * @param[in] max_conns	  :user main structure
+ *
+ * @return: 0 if success . -1 if error
+ */
 int adjust_max_fd(int max_conns)
 {
 	struct rlimit rlim;
@@ -238,4 +297,6 @@ int adjust_max_fd(int max_conns)
             return -1;
         }
     }
+
+	return 0;
 }

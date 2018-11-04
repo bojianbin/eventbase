@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "cmd_parse.h"
+#include "eventbase_cmd_parse.h"
 
 
 
@@ -52,7 +52,7 @@ parse_status_e protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_
 	while( ptr < readbuf + totallen && 
 		(ret = memmem(ptr,totallen - (ptr-readbuf),str_find,strlen(str_find)) ) != 0)
 	{
-		eventbase_copy_write_date(c, ret_world,strlen(ret_world) );
+		eventbase_copy_write_data(c, ret_world,strlen(ret_world) );
 		ptr = ret + strlen(str_find);
 		retvalue = PARSE_DONE_NEED_WRITE;
 	}

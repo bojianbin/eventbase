@@ -12,10 +12,10 @@
 #include <string.h>
 #include <sys/prctl.h>
 
-#include "anet.h"
-#include "server_setting.h"
-#include "threads.h"
-#include "cmd_parse.h"
+#include "eventbase_anet.h"
+#include "eventbase_server_setting.h"
+#include "eventbase_threads.h"
+#include "eventbase_cmd_parse.h"
 #include "event2/event.h"
 #include "event2/event_struct.h"
 
@@ -573,7 +573,7 @@ int  conn_msg_reset(conn_t *c)
  *
  * @return: 0 if success . -1 if error
  */
-int eventbase_copy_write_date(conn_t *c , void *buf, int len)
+int eventbase_copy_write_data(conn_t *c , void *buf, int len)
 {
 	if(!c || !buf || len <= 0 || len > c->wsize - c->wbytes)
 		return -1;

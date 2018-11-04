@@ -5,7 +5,7 @@
 #include <sys/resource.h>
 #include <signal.h>
 
-#include "server_setting.h"
+#include "eventbase_server_setting.h"
 #include "iniparser.h"
 
 server_setting_t g_setting;

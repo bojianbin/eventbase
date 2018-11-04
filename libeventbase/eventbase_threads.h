@@ -5,8 +5,8 @@
 	> Created Time: Mon 29 Oct 2018 04:53:54 PM CST
  ************************************************************************/
 
-#ifndef _THREADS_H
-#define _THREADS_H
+#ifndef _EVENTBASE_THREADS_H
+#define _EVENTBASE_THREADS_H
 
 #ifdef __cplusplus
 extern "C"
@@ -177,7 +177,7 @@ int eventbase_data_init(struct event_base * main_base);
 int eventbase_server_socket(int port,struct event_base *main_base);
 void eventbase_thread_init(int nthreads) ;
 
-int eventbase_copy_write_date(conn_t *c , void *buf, int len);
+int eventbase_copy_write_data(conn_t *c , void *buf, int len);
 int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
 
 #ifdef __cplusplus

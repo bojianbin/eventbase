@@ -13,8 +13,8 @@
 #include <time.h>
 #include <sys/prctl.h>
 
-#include "threads.h"
-#include "server_setting.h"
+#include "eventbase_threads.h"
+#include "eventbase_server_setting.h"
 #include "event2/event.h"
 #include "event2/event_struct.h"
 

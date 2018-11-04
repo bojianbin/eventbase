@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ANET_H
-#define ANET_H
+#ifndef _EVENTBASE_ANET_H
+#define _EVENTBASE_ANET_H
 
 
 #ifdef __cplusplus

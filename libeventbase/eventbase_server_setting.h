@@ -1,5 +1,5 @@
-#ifndef _SERVER_SETTING__h
-#define _SERVER_SETTING__h
+#ifndef _EVENTBASE_SERVER_SETTING__h
+#define _EVENTBASE_SERVER_SETTING__h
 
 #ifdef __cplusplus
 extern "C"

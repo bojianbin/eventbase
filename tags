@@ -1272,6 +1272,7 @@ add_item_to_array	libcJSON/cJSON.c	/^static cJSON_bool add_item_to_array(cJSON *
 add_item_to_object	libcJSON/cJSON.c	/^static cJSON_bool add_item_to_object(cJSON * const object, const char * const string, cJSON * const item, const internal_hooks * const hooks, const cJSON_bool constant_key)$/;"	f	file:
 add_msghdr	libeventbase/eventbase_threads.c	/^static int add_msghdr(conn_t *c)$/;"	f	file:
 addr	libeventbase/eventbase_server_setting.h	/^	void * addr;$/;"	m	struct:__anon10
+addr	z_my_work/test_client.c	/^struct sockaddr_in addr;$/;"	v	typeref:struct:sockaddr_in
 address	libcJSON/test.c	/^    const char *address;$/;"	m	struct:record	file:
 adjust_max_fd	libeventbase/eventbase_server_setting.c	/^int adjust_max_fd(int max_conns)$/;"	f
 allocate	libcJSON/cJSON.c	/^    void *(CJSON_CDECL *allocate)(size_t size);$/;"	m	struct:internal_hooks	file:
@@ -1697,6 +1698,7 @@ failing_realloc	libcJSON/tests/misc_tests.c	/^static void * CJSON_CDECL failing_
 false	libcJSON/cJSON.c	62;"	d	file:
 false	libcJSON/cJSON_Utils.c	54;"	d	file:
 false	libeventbase/eventbase_threads.h	45;"	d
+fd	z_my_work/test_client.c	/^int fd = -1;$/;"	v
 file_test10_should_be_parsed_and_printed	libcJSON/tests/parse_examples.c	/^static void file_test10_should_be_parsed_and_printed(void)$/;"	f	file:
 file_test11_should_be_parsed_and_printed	libcJSON/tests/parse_examples.c	/^static void file_test11_should_be_parsed_and_printed(void)$/;"	f	file:
 file_test1_should_be_parsed_and_printed	libcJSON/tests/parse_examples.c	/^static void file_test1_should_be_parsed_and_printed(void)$/;"	f	file:
@@ -1828,6 +1830,7 @@ keyname	libeventbase/eventbase_server_setting.h	/^	char * keyname;$/;"	m	struct:
 last_cmd_time	libeventbase/eventbase_threads.h	/^    unsigned int last_cmd_time;$/;"	m	struct:conn_s
 lat	libcJSON/test.c	/^    double lat;$/;"	m	struct:record	file:
 len	libeventbase/eventbase_server_setting.h	/^	int len;$/;"	m	struct:__anon10
+len	z_my_work/test_client.c	/^socklen_t len;$/;"	v
 length	libcJSON/cJSON.c	/^    size_t length;$/;"	m	struct:__anon2	file:
 length	libcJSON/cJSON.c	/^    size_t length;$/;"	m	struct:__anon3	file:
 line_status	libiniparser/iniparser.c	/^} line_status ;$/;"	t	typeref:enum:_line_status_	file:
@@ -1892,7 +1895,7 @@ main	libcJSON/tests/unity/test/testdata/testRunnerGeneratorWithMocks.c	/^int mai
 main	libevent/sample.c	/^int main()$/;"	f
 main	libiniparser/sample.c	/^int main(int argc, char * argv[])$/;"	f
 main	z_my_work/main.c	/^int main()$/;"	f
-main	z_my_work/test_client.c	/^int main()$/;"	f
+main	z_my_work/test_client.c	/^int main(int argc,char *argv[])$/;"	f
 malloc	libcJSON/tests/unity/extras/fixture/src/unity_fixture.c	160;"	d	file:
 malloc	libcJSON/tests/unity/extras/fixture/src/unity_fixture_malloc_overrides.h	37;"	d
 malloc_count	libcJSON/tests/unity/extras/fixture/src/unity_fixture.c	/^static int malloc_count;$/;"	v	file:
@@ -1911,6 +1914,7 @@ mockMock_Init	libcJSON/tests/unity/test/testdata/cmock.h	/^void mockMock_Init(vo
 mockMock_Init_Counter	libcJSON/tests/unity/test/testdata/cmock.h	/^int mockMock_Init_Counter = 0;$/;"	v
 mockMock_Verify	libcJSON/tests/unity/test/testdata/cmock.h	/^void mockMock_Verify(void)         { mockMock_Verify_Counter++;  }$/;"	f
 mockMock_Verify_Counter	libcJSON/tests/unity/test/testdata/cmock.h	/^int mockMock_Verify_Counter = 0;$/;"	v
+mode_tcp	z_my_work/test_client.c	/^int mode_tcp = 1;$/;"	v
 msgbytes	libeventbase/eventbase_threads.h	/^    int    msgbytes;  \/* number of bytes in current msg *\/$/;"	m	struct:conn_s
 msgcurr	libeventbase/eventbase_threads.h	/^    int    msgcurr;   \/* element in msglist[] being transmitted now *\/$/;"	m	struct:conn_s
 msglist	libeventbase/eventbase_threads.h	/^    struct msghdr *msglist;$/;"	m	struct:conn_s	typeref:struct:conn_s::msghdr
@@ -2148,6 +2152,8 @@ sfd	libeventbase/eventbase_threads.h	/^    int    sfd;$/;"	m	struct:conn_s
 should	libcJSON/tests/unity/test/rakefile_helper.rb	/^  def should(behave, &block)$/;"	f
 should_RunTestsStartingWithShouldByDefault	libcJSON/tests/unity/test/testdata/testRunnerGenerator.c	/^void should_RunTestsStartingWithShouldByDefault(void)$/;"	f
 should_RunTestsStartingWithShouldByDefault	libcJSON/tests/unity/test/testdata/testRunnerGeneratorWithMocks.c	/^void should_RunTestsStartingWithShouldByDefault(void)$/;"	f
+sig_func	z_my_work/test_client.c	/^void sig_func(int sig)$/;"	f
+sig_func_udp	z_my_work/test_client.c	/^void sig_func_udp(int sig)$/;"	f
 sigignore	libeventbase/eventbase_server_setting.c	/^int sigignore(int sig) $/;"	f
 sigint_func	libevent/sample.c	/^void sigint_func(evutil_socket_t fd, short flags, void *arg)$/;"	f
 size	libcJSON/cJSON.h	/^CJSON_PUBLIC(void *) cJSON_malloc(size_t size);$/;"	v

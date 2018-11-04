@@ -378,7 +378,10 @@ read_status_e try_read_udp(conn_t *c)
 		c->rbytes += ret;	
 		return READ_SOME_DATA;
 	}
-	
+	else
+	{
+		return READ_DATA_DONE;
+	}
 	return READ_NONE;
 }
 read_status_e try_read_network(conn_t *c) 
@@ -687,11 +690,11 @@ transmit_result_e try_send_data(conn_t *c)
 	if(c->wbytes <= 0) return TRANSMIT_COMPLETE;
 	if(re_line )
 	{
-		data_line_num = c->wbytes - (c->wcurr - c->wbuf) ;
-		data_line2_num = c->wbytes - data_line_num;
+		data_line_num = c->wsize - (c->wcurr - c->wbuf) ;
+		data_line2_num = re_pos;
 	}else
 	{
-		data_line_num = c->wbytes - (c->wcurr - c->wbuf) ;
+		data_line_num = c->wbytes;
 		data_line2_num = 0;
 	}
 
@@ -706,7 +709,7 @@ transmit_result_e try_send_data(conn_t *c)
 			return TRANSMIT_COMPLETE;
 		}else if(ret > 0)
 		{
-			c->wcurr += ret ;
+			c->wcurr = c->wbuf + (c->wcurr - c->wbuf + ret) % c->wsize ;
 			c->wbytes -= ret ;
 			if(ret != data_line_num)
 			{
@@ -729,7 +732,7 @@ transmit_result_e try_send_data(conn_t *c)
 			return TRANSMIT_COMPLETE;
 		}else if(ret > 0)
 		{
-			c->wcurr += ret ;
+			c->wcurr = c->wbuf + (c->wcurr - c->wbuf + ret) % c->wsize ;
 			c->wbytes -= ret ;
 			if(ret != data_line2_num)
 			{
@@ -797,7 +800,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 
 void eventbase_add_wevent(conn_t *c)
 {
-	if(c->wstate != conn_nowrite)
+	if(c->wstate == conn_write || c->wstate == conn_mwrite)
 		return;
 	if(c->wbytes != 0)
 		c->wstate = conn_write;
@@ -811,7 +814,7 @@ void eventbase_add_wevent(conn_t *c)
 }
 void eventbase_delete_wevent(conn_t *c)
 {
-	if(c->wstate == conn_nowrite)
+	if(c->wstate != conn_write && c->wstate != conn_mwrite)
 		return;
 	
 	
@@ -963,7 +966,7 @@ void write_machine(conn_t *c)
 {
 	int ret;
 	int stop = false;
-	
+
 	while(stop == false)
 	{
 		switch(c->wstate)
@@ -1325,6 +1328,7 @@ int eventbase_server_socket(int port,struct event_base *main_base)
 	udp_fd = anetUdpServer(NULL, port, NULL);
 	if(udp_fd < 0 )
 		goto ERR;
+	anetNonBlock(NULL, udp_fd);
 
 	for( i = 0 ; i < g_setting.num_work_threads ; i++)
 	{

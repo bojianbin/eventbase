@@ -58,6 +58,7 @@ parse_status_e protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_
 	}
 	
 	*parsed_len = ptr - readbuf;
+	//printf("parse %d %d  %d\n",totallen,*parsed_len,c->rbytes);
 
 END:
 	return retvalue;

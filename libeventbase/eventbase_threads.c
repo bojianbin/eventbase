@@ -271,7 +271,7 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
         return NULL;
     }
 
-	//add_msghdr(c);
+	add_msghdr(c);
 
     return c;
 }
@@ -478,7 +478,7 @@ static int add_msghdr(conn_t *c)
     }
 
     c->msgbytes = 0;
-
+	c->msgused += 1;
     return 0;
 }
 void print_s(conn_t *c)
@@ -557,15 +557,15 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
 	if(buf == NULL || len <= 0 )
 		return -1;
 
-	if(c->msgused == c->msgsize)
+	if(c->msgused >= c->msgsize)
 		return -1;
-	if(c->iovsize == c->iovused)
+	if(c->iovused >= c->iovsize)
 		return -1;
 	
     if (c->transport == udp_transport) 
 	{
         do {
-            m = &c->msglist[(c->msgcurr + c->msgused ) % c->msgsize];
+            m = &c->msglist[(c->msgcurr + c->msgused - 1) % c->msgsize];
 
             /*
              * Limit UDP packets to UDP_MAX_PAYLOAD_SIZE bytes.
@@ -573,12 +573,13 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
 
             /* We may need to start a new msghdr if this one is full. */
             if (m->msg_iovlen == IOV_MAX ||
-                (c->msgbytes >= UDP_MAX_PAYLOAD_SIZE)) 
+                (c->msgbytes >= UDP_MAX_PAYLOAD_SIZE) ||
+                 c->iovcurr + c->iovused >= c->iovsize) //iov can not wrap in an msghdr
            	{
                 ret = add_msghdr(c);
 				if(ret < 0)
 					return -1;
-                m = &c->msglist[(c->msgcurr + c->msgused ) % c->msgsize];
+                m = &c->msglist[(c->msgcurr + c->msgused -1 ) % c->msgsize];
             }
 
             /* If the fragment is too big to fit in the datagram, split it up */
@@ -591,40 +592,40 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
                 leftover = 0;
             }
 
-            m = &c->msglist[(c->msgcurr + c->msgused ) % c->msgsize];
+            m = &c->msglist[(c->msgcurr + c->msgused - 1) % c->msgsize];
             m->msg_iov[m->msg_iovlen].iov_base = (void *)buf;
             m->msg_iov[m->msg_iovlen].iov_len = len;
 
             c->msgbytes += len;
             m->msg_iovlen++;
 			c->iovused++;
-			c->msgused++;
-
+			
             buf = ((char *)buf) + len;
             len = leftover;
         } while (leftover > 0);
 
     } else 
 	{
+		
         /* Optimized path for TCP connections */
-        m = &c->msglist[ (c->msgcurr + c->msgused) % c->msgsize ];
-        if (m->msg_iovlen == IOV_MAX) 
+        m = &c->msglist[ (c->msgcurr + c->msgused - 1) % c->msgsize ];
+        if (m->msg_iovlen == IOV_MAX || c->iovcurr + c->iovused >= c->iovsize) 
 		{
             ret = add_msghdr(c);
 			if(ret < 0)
 				return -1;
-            m = &c->msglist[(c->msgcurr + c->msgused) % c->msgsize ];
+            m = &c->msglist[(c->msgcurr + c->msgused - 1) % c->msgsize ];
         }
 
         m->msg_iov[m->msg_iovlen].iov_base = (void *)buf;
         m->msg_iov[m->msg_iovlen].iov_len = len;
         c->msgbytes += len;
         c->iovused++;
-		c->msgused++;
         m->msg_iovlen++;
+		
     }
-	
-	print_s(c);
+
+	//print_s(c);
     return 0;
 }
 
@@ -735,7 +736,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 
  	while(1)
  	{
-	    if (c->msgused > 0) 
+	    if (c->msgused > 0 && c->msglist[c->msgcurr].msg_iovlen > 0) 
 		{
 	        ssize_t res;
 	        struct msghdr *m = &c->msglist[c->msgcurr];
@@ -781,6 +782,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 	    } else 
 		{
 			c->msgcurr--;
+			c->msgused++;
 			if(c->msgcurr < 0) c->msgcurr = c->msgsize - 1;
 	        return TRANSMIT_COMPLETE;
 	    }
@@ -877,6 +879,7 @@ void drive_machine(conn_t *c)
 				break;
 				
 			case conn_read:
+				
 				c->last_cmd_time = current_time;
 				if(c->transport == udp_transport)
 					read_ret = try_read_udp(c);
@@ -900,10 +903,10 @@ void drive_machine(conn_t *c)
 				
 				break;
 			case conn_parse_cmd:
+				
 				c->last_cmd_time = current_time;
 				parse_len = 0;
 				parse_ret = protocol_parse(c,c->rcurr,c->rbytes,&parse_len);
-				
 				if(parse_len < 0 || parse_len > c->rsize)
 				{/*value parse_len illegal*/
 					conn_set_state(c, conn_closing);
@@ -989,7 +992,7 @@ void write_machine(conn_t *c)
 				break;
 				
 			case conn_mwrite:
-				printf("in mwrite\n");
+				
 				c->last_cmd_time = current_time;
 				switch (try_send_mdata(c)) 
 				{
@@ -1017,7 +1020,8 @@ void write_machine(conn_t *c)
 							conn_set_wstate(c, conn_wclosing);
 						}
 				}
-				print_s(c);
+				
+				//print_s(c);
 				break;
 			case conn_wclosing:
 				c->thread->stats->curr_clients--;
@@ -1167,7 +1171,7 @@ static void *worker_libevent(void *arg)
 	char thread_name[32] = {0};
     EVENT_THREAD *me = arg;
 
-	sprintf(thread_name,"event_%d",me - threads + 1);
+	sprintf(thread_name,"event_%d",(int)(me - threads + 1));
 	prctl(PR_SET_NAME,thread_name);
 	
     event_base_dispatch(me->base);

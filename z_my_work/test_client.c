@@ -18,10 +18,11 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include<arpa/inet.h>
+#include <arpa/inet.h>
 
 
 #include <stdio.h>
@@ -100,7 +101,7 @@ void * thread_func(void * arg)
 		else
 			sig_func_udp(0);
 		
-		usleep(100000);
+		usleep(10000);
 	}
 
 	return NULL;
@@ -131,7 +132,7 @@ int main(int argc,char *argv[])
 	
 	srand(time(NULL));
 	
-	//pthread_create(&tid,NULL,thread_func,NULL);
+	pthread_create(&tid,NULL,thread_func,NULL);
 	if(mode_tcp)
 	{
 		int count = 0;

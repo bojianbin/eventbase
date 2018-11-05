@@ -23,11 +23,9 @@ extern "C"
 #define DATA_BUFFER_SIZE 2048
 
 /** Initial size of the sendmsg() scatter/gather array. */
-#define IOV_LIST_INITIAL 100
-#define IOV_LIST_MAX 200
+#define IOV_LIST_INITIAL 200
 /** Initial number of sendmsg() argument structures to allocate. */
-#define MSG_LIST_INITIAL 10
-#define MSG_LIST_MAX 20
+#define MSG_LIST_INITIAL 20
 
 #define UDP_READ_BUFFER_SIZE 65536
 #define UDP_MAX_PAYLOAD_SIZE 1400
@@ -113,13 +111,26 @@ typedef struct conn_queue_s
 
 typedef struct 
 {
+	uint32_t total_clients;
+	uint32_t curr_clients;
+	uint32_t malloc_fails;
+}thread_stat_t;
+typedef struct 
+{
+	uint64_t  maxconns_times;
+	uint32_t  maxconns_last_occur;
+	thread_stat_t *thread_stat;
+}server_stat_t;
+
+typedef struct 
+{
     pthread_t thread_id;        /* unique ID of this thread */
     struct event_base *base;    /* libevent handle this thread uses */
     struct event notify_event;  /* listen event for notify pipe */
     int notify_receive_fd;      /* receiving end of notify pipe */
     int notify_send_fd;         /* sending end of notify pipe */
     conn_queue_t *new_conn_queue; /* queue of new connections to handle */
-	
+	thread_stat_t *stats;
 } EVENT_THREAD;
 
 typedef struct conn_s
@@ -151,6 +162,7 @@ typedef struct conn_s
     struct iovec *iov;
     int    iovsize;   /* number of elements allocated in iov[] */
     int    iovused;   /* number of elements used in iov[] */
+	int    iovcurr;   /* element in being transmitted now */
 
     struct msghdr *msglist;
     int    msgsize;   /* number of elements allocated in msglist[] */

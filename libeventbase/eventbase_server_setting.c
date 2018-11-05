@@ -12,10 +12,14 @@ server_setting_t g_setting;
 
 static key_value_t setting_parse[] = 
 {
-	{"COMMON","num_worker_threads",	&g_setting.num_work_threads,	VALUE_INT,	sizeof(g_setting.num_work_threads)},
-	{"COMMON","server_port",		&g_setting.server_port,			VALUE_INT, 	sizeof(g_setting.server_port)},
-	{"COMMON","max_connections",	&g_setting.max_connections,		VALUE_INT,	sizeof(g_setting.max_connections)},
-	{"DETAIL","max_user_rbuf",		&g_setting.max_user_rbuf,		VALUE_INT,	sizeof(g_setting.max_user_rbuf)}
+	{"COMMON","num_worker_threads",	&g_setting.num_work_threads,	VALUE_INT,	
+		sizeof(g_setting.num_work_threads),"number of worker threads"},
+	{"COMMON","server_port",		&g_setting.server_port,			VALUE_INT, 	
+		sizeof(g_setting.server_port),"server listen port.both tcp and udp"},
+	{"COMMON","max_connections",	&g_setting.max_connections,		VALUE_INT,	
+		sizeof(g_setting.max_connections),"server max connections"},
+	{"DETAIL","max_user_rbuf",		&g_setting.max_user_rbuf,		VALUE_INT,	
+		sizeof(g_setting.max_user_rbuf),NULL}
 };
 
 /**
@@ -38,6 +42,7 @@ void setting_init(server_setting_t *setting)
 	setting->server_port = 6737;
 
 	setting->max_user_rbuf = 5120;
+	
 	return;
 }
 
@@ -156,6 +161,8 @@ int setting_write()
 				fprintf(fp, "[%s]\n", setting_parse[i].section);
 				section_write_once = 1;
 			}
+			if(setting_parse[i].comment != NULL)
+				fprintf(fp,"#%s\n",setting_parse[i].comment);
 			switch (setting_parse[i].type) {
 			case VALUE_UINT:
 				fprintf(fp,"%s = %u\n", setting_parse[i].keyname, *(unsigned int *)setting_parse[i].addr);

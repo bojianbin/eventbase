@@ -24,6 +24,7 @@ typedef struct
 	void * addr;
 	value_type_e type;
 	int len;
+	char *comment;
 }key_value_t;
 
 typedef struct
@@ -33,6 +34,7 @@ typedef struct
 	int max_connections;
 
 	int max_user_rbuf;
+	int max_mute_time;
 	
 }server_setting_t;
 

@@ -90,10 +90,26 @@ void sig_func(int sig)
 
 	return ;
 }
+
+void * thread_func(void * arg)
+{
+	while(1)
+	{
+		if(mode_tcp)
+			sig_func(0);
+		else
+			sig_func_udp(0);
+		
+		usleep(100000);
+	}
+
+	return NULL;
+}
 int main(int argc,char *argv[])
 {
 	char buf[1024] = {0};
 	int ret;
+	pthread_t tid;
 
 
 	if(argc == 2 && strcmp(argv[1],"udp") == 0)
@@ -114,19 +130,22 @@ int main(int argc,char *argv[])
 		signal(SIGQUIT,sig_func_udp);
 	
 	srand(time(NULL));
-
+	
+	//pthread_create(&tid,NULL,thread_func,NULL);
 	if(mode_tcp)
 	{
+		int count = 0;
 		while((ret = read(fd,buf,1024)) > 0)
 		{
-			printf("%s",buf);
+			printf("%d -> %s",count++,buf);
 			memset(buf,0,1024);
 		}
 	}else
 	{
+		int count = 0;
 		while((ret = recvfrom(fd,buf,1024,0,(struct sockaddr *)&addr,&len)) > 0)
 		{
-			printf("%s",buf);
+			printf("%d -> %s ",count++,buf);
 			memset(buf,0,1024);
 		}
 	}

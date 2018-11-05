@@ -19,7 +19,9 @@
 #include "event2/event.h"
 #include "event2/event_struct.h"
 
-static EVENT_THREAD *threads = NULL;
+static EVENT_THREAD 	*threads = NULL;
+static server_stat_t   	server_stats;
+
 conn_t **conns = NULL;
 static conn_queue_item_t *cqi_freelist = NULL;
 static pthread_mutex_t cqi_freelist_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -255,6 +257,7 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
     c->wcurr = c->wbuf;
     c->rcurr = c->rbuf;
     c->iovused = 0;
+	c->iovcurr = 0;
     c->msgcurr = 0;
     c->msgused = 0;
     c->last_cmd_time = current_time; /* initialize for idle kicker */
@@ -268,7 +271,7 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
         return NULL;
     }
 
-	add_msghdr(c);
+	//add_msghdr(c);
 
     return c;
 }
@@ -311,7 +314,7 @@ static void conn_close(conn_t *c)
 
     /* delete the event, the socket and the conn */
     event_del(&c->event);
-	if(c->wstate != conn_nowrite)
+	if(c->wstate == conn_write || c->wstate == conn_mwrite)
 		event_del(&c->wevent);
     conn_cleanup(c);
 
@@ -406,6 +409,7 @@ read_status_e try_read_network(conn_t *c)
             char *new_rbuf = realloc(c->rbuf, new_size);
             if (!new_rbuf) 
 			{
+				c->thread->stats->malloc_fails++;
                 return READ_ERROR;
             }
             c->rcurr = c->rbuf = new_rbuf;
@@ -446,39 +450,6 @@ read_status_e try_read_network(conn_t *c)
 
 
 /*
- * Ensures that there is room for another struct iovec in a connection's
- * iov list.
- *
- * Returns 0 on success, -1 on out-of-memory.
- */
-static int ensure_iov_space(conn_t *c) 
-{
-    if(c == NULL)
-		return -1;
-
-    if (c->iovused >= c->iovsize) 
-	{
-        int i, iovnum;
-        struct iovec *new_iov = (struct iovec *)realloc(c->iov,(c->iovsize * 2) * sizeof(struct iovec));
-        if (! new_iov) 
-		{
-            return -1;
-        }
-        c->iov = new_iov;
-        c->iovsize *= 2;
-
-        /* Point all the msghdr structures at the new list. */
-        for (i = 0, iovnum = 0; i < c->msgused; i++) 
-		{
-            c->msglist[i].msg_iov = &c->iov[iovnum];
-            iovnum += c->msglist[i].msg_iovlen;
-        }
-    }
-
-    return 0;
-}
-
-/*
  * Adds a message header to a connection.
  *
  * Returns 0 on success, -1 on out-of-memory.
@@ -492,24 +463,13 @@ static int add_msghdr(conn_t *c)
     	return -1;
     }
 
-    if (c->msgsize == c->msgused) 
-	{
-        msg = realloc(c->msglist, c->msgsize * 2 * sizeof(struct msghdr));
-        if (! msg) 
-		{
-            return -1;
-        }
-        c->msglist = msg;
-        c->msgsize *= 2;
-    }
-
-    msg = c->msglist + c->msgused;
+    msg = &(c->msglist[ (c->msgcurr + c->msgused) % c->msgsize]);
 
     /* this wipes msg_iovlen, msg_control, msg_controllen, and
        msg_flags, the last 3 of which aren't defined on solaris: */
     memset(msg, 0, sizeof(struct msghdr));
 
-    msg->msg_iov = &c->iov[c->iovused];
+    msg->msg_iov = &c->iov[(c->iovcurr + c->iovused) % c->iovsize];
 
     if (c->transport == udp_transport && c->request_addr_size > 0) 
 	{
@@ -518,43 +478,24 @@ static int add_msghdr(conn_t *c)
     }
 
     c->msgbytes = 0;
-    c->msgused++;
 
     return 0;
 }
+void print_s(conn_t *c)
+{
+	printf("[size:%d used:%d cur:%d bytes:%d]  [iovsize:%d iovused:%d iovcur:%d]\n",
+		c->msgsize,c->msgused,c->msgcurr,c->msgbytes,
+		c->iovsize,c->iovused,c->iovcurr);
 
+	return;
+}
 int  conn_msg_reset(conn_t *c)
 {
 	int ret = 0;
 	if(c == NULL) return -1;
 
 	
-    if (c->msgsize > MSG_LIST_MAX) 
-	{
-        struct msghdr *newbuf = (struct msghdr *) realloc((void *)c->msglist, MSG_LIST_INITIAL * sizeof(c->msglist[0]));
-        if (newbuf) 
-		{
-            c->msglist = newbuf;
-            c->msgsize = MSG_LIST_INITIAL;
-        }else
-        {
-        	return -1;
-        }
-    }
-
-    if (c->iovsize > IOV_LIST_MAX) 
-	{
-        struct iovec *newbuf = (struct iovec *) realloc((void *)c->iov, IOV_LIST_INITIAL * sizeof(c->iov[0]));
-        if (newbuf) 
-		{
-            c->iov = newbuf;
-            c->iovsize = IOV_LIST_INITIAL;
-        }else
-        {
-        	return -1;
-        }
-    }
-
+	c->iovcurr = 0;
 	c->iovused = 0;
     c->msgcurr = 0;
     c->msgused = 0;
@@ -609,16 +550,22 @@ int eventbase_copy_write_data(conn_t *c , void *buf, int len)
  */
 int eventbase_add_write_data(conn_t *c, const void *buf, int len) 
 {
+	int ret ;
     struct msghdr *m;
     int leftover;
 
 	if(buf == NULL || len <= 0 )
 		return -1;
 
+	if(c->msgused == c->msgsize)
+		return -1;
+	if(c->iovsize == c->iovused)
+		return -1;
+	
     if (c->transport == udp_transport) 
 	{
         do {
-            m = &c->msglist[c->msgused - 1];
+            m = &c->msglist[(c->msgcurr + c->msgused ) % c->msgsize];
 
             /*
              * Limit UDP packets to UDP_MAX_PAYLOAD_SIZE bytes.
@@ -628,12 +575,11 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
             if (m->msg_iovlen == IOV_MAX ||
                 (c->msgbytes >= UDP_MAX_PAYLOAD_SIZE)) 
            	{
-                add_msghdr(c);
-                m = &c->msglist[c->msgused - 1];
+                ret = add_msghdr(c);
+				if(ret < 0)
+					return -1;
+                m = &c->msglist[(c->msgcurr + c->msgused ) % c->msgsize];
             }
-
-            if (ensure_iov_space(c) != 0)
-                return -1;
 
             /* If the fragment is too big to fit in the datagram, split it up */
             if (len + c->msgbytes > UDP_MAX_PAYLOAD_SIZE) 
@@ -645,13 +591,14 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
                 leftover = 0;
             }
 
-            m = &c->msglist[c->msgused - 1];
+            m = &c->msglist[(c->msgcurr + c->msgused ) % c->msgsize];
             m->msg_iov[m->msg_iovlen].iov_base = (void *)buf;
             m->msg_iov[m->msg_iovlen].iov_len = len;
 
             c->msgbytes += len;
-            c->iovused++;
             m->msg_iovlen++;
+			c->iovused++;
+			c->msgused++;
 
             buf = ((char *)buf) + len;
             len = leftover;
@@ -660,22 +607,24 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
     } else 
 	{
         /* Optimized path for TCP connections */
-        m = &c->msglist[c->msgused - 1];
-        if (m->msg_iovlen == IOV_MAX) {
-            add_msghdr(c);
-            m = &c->msglist[c->msgused - 1];
+        m = &c->msglist[ (c->msgcurr + c->msgused) % c->msgsize ];
+        if (m->msg_iovlen == IOV_MAX) 
+		{
+            ret = add_msghdr(c);
+			if(ret < 0)
+				return -1;
+            m = &c->msglist[(c->msgcurr + c->msgused) % c->msgsize ];
         }
-
-        if (ensure_iov_space(c) != 0)
-            return -1;
 
         m->msg_iov[m->msg_iovlen].iov_base = (void *)buf;
         m->msg_iov[m->msg_iovlen].iov_len = len;
         c->msgbytes += len;
         c->iovused++;
+		c->msgused++;
         m->msg_iovlen++;
     }
-
+	
+	print_s(c);
     return 0;
 }
 
@@ -701,9 +650,26 @@ transmit_result_e try_send_data(conn_t *c)
 	if(data_line_num)
 	{
 		if(c->transport == udp_transport)
-			ret = sendto(c->sfd,c->wcurr,data_line_num,0,(struct sockaddr *)&(c->request_addr),c->request_addr_size);
-		else
+		{
+			int sum = 0;
+			int packet = data_line_num;
+			while(sum < data_line_num)
+			{
+				if(packet > UDP_MAX_PAYLOAD_SIZE)
+					packet = UDP_MAX_PAYLOAD_SIZE;
+				ret = sendto(c->sfd,c->wcurr + sum,packet,0,(struct sockaddr *)&(c->request_addr),c->request_addr_size);
+				if(ret <= 0)
+					return TRANSMIT_ERROR;
+				sum += ret ;
+				packet =  data_line_num - sum;
+			}
+			/*udp mode always*/
+			ret = data_line_num;
+			
+		}else
+		{
 			ret = send(c->sfd,c->wcurr,data_line_num,0);
+		}
 		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGAIN))
 		{
 			return TRANSMIT_COMPLETE;
@@ -724,9 +690,26 @@ transmit_result_e try_send_data(conn_t *c)
 	{
 		c->wcurr = c->wbuf;
 		if(c->transport == udp_transport)
-			ret = sendto(c->sfd,c->wcurr,data_line2_num,0,(struct sockaddr *)&(c->request_addr),c->request_addr_size);
-		else
+		{
+			int sum = 0;
+			int packet = data_line2_num;
+			while(sum < data_line2_num)
+			{
+				if(packet > UDP_MAX_PAYLOAD_SIZE)
+					packet = UDP_MAX_PAYLOAD_SIZE;
+				ret = sendto(c->sfd,c->wcurr + sum,packet,0,(struct sockaddr *)&(c->request_addr),c->request_addr_size);
+				if(ret <= 0)
+					return TRANSMIT_ERROR;
+				sum += ret ;
+				packet =  data_line2_num - sum;
+			}
+			/*udp mode always*/
+			ret = data_line2_num;
+			
+		}else
+		{
 			ret = send(c->sfd,c->wcurr,data_line2_num,0);
+		}
 		if(ret < 0 && (errno == EWOULDBLOCK || errno == EAGAIN))
 		{
 			return TRANSMIT_COMPLETE;
@@ -752,7 +735,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 
  	while(1)
  	{
-	    if (c->msgcurr < c->msgused && c->msglist[c->msgcurr].msg_iovlen != 0) 
+	    if (c->msgused > 0) 
 		{
 	        ssize_t res;
 	        struct msghdr *m = &c->msglist[c->msgcurr];
@@ -761,7 +744,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 	        if (res > 0) 
 			{
 
-
+				c->msgbytes -= res;
 	            /* We've written some of the data. Remove the completed
 	               iovec entries from the list of pending writes. */
 	            while (m->msg_iovlen > 0 && res >= m->msg_iov->iov_len) 
@@ -769,6 +752,9 @@ transmit_result_e try_send_mdata(conn_t *c)
 	                res -= m->msg_iov->iov_len;
 	                m->msg_iovlen--;
 	                m->msg_iov++;
+					if(m->msg_iov >= c->iov + c->iovsize)  m->msg_iov = c->iov;
+					c->iovused--;
+					c->iovcurr = ( ++c->iovcurr ) % c->iovsize ;
 	            }
 
 	            /* Might have written just part of the last iovec entry;
@@ -779,7 +765,9 @@ transmit_result_e try_send_mdata(conn_t *c)
 	                m->msg_iov->iov_len -= res;
 					return TRANSMIT_INCOMPLETE;
 	            }
-	           	c->msgcurr++;
+				c->msgcurr = ( ++c->msgcurr) % c->msgsize ;
+				c->msgused--;
+				
 				continue;
 	        }
 	        if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) 
@@ -792,9 +780,11 @@ transmit_result_e try_send_mdata(conn_t *c)
 	        return TRANSMIT_ERROR;
 	    } else 
 		{
+			c->msgcurr--;
+			if(c->msgcurr < 0) c->msgcurr = c->msgsize - 1;
 	        return TRANSMIT_COMPLETE;
 	    }
-		c->msgcurr++;
+		c->msgcurr = ( ++c->msgcurr ) % c->msgsize;
  	}
 }
 
@@ -861,6 +851,8 @@ void drive_machine(conn_t *c)
 	                    stop = true;
 	                } else if (errno == EMFILE) 
 	                {
+	                	server_stats.maxconns_last_occur = current_time;
+						server_stats.maxconns_times++;
 	                	/*too many open fds*/
 	                    stop = true;
 	                } else 
@@ -885,7 +877,7 @@ void drive_machine(conn_t *c)
 				break;
 				
 			case conn_read:
-				
+				c->last_cmd_time = current_time;
 				if(c->transport == udp_transport)
 					read_ret = try_read_udp(c);
 				else
@@ -908,6 +900,7 @@ void drive_machine(conn_t *c)
 				
 				break;
 			case conn_parse_cmd:
+				c->last_cmd_time = current_time;
 				parse_len = 0;
 				parse_ret = protocol_parse(c,c->rcurr,c->rbytes,&parse_len);
 				
@@ -944,6 +937,7 @@ void drive_machine(conn_t *c)
 				break;
 
 			case conn_closing:
+				c->thread->stats->curr_clients--;
 				if (c->transport == udp_transport)
 	                conn_cleanup(c);
 	            else
@@ -972,6 +966,7 @@ void write_machine(conn_t *c)
 		switch(c->wstate)
 		{
 			case conn_write:
+				c->last_cmd_time = current_time;
 				switch (try_send_data(c)) 
 				{
 					case TRANSMIT_COMPLETE:
@@ -994,16 +989,19 @@ void write_machine(conn_t *c)
 				break;
 				
 			case conn_mwrite:
+				printf("in mwrite\n");
+				c->last_cmd_time = current_time;
 				switch (try_send_mdata(c)) 
 				{
 					case TRANSMIT_COMPLETE:
 						eventbase_delete_wevent(c);
+						/*
 						ret = conn_msg_reset(c);
 						if(ret < 0)
 						{
 							conn_set_wstate(c, conn_wclosing);
 							break;
-						}
+						}*/
 						stop = true;
 						break;
 
@@ -1019,8 +1017,10 @@ void write_machine(conn_t *c)
 							conn_set_wstate(c, conn_wclosing);
 						}
 				}
+				print_s(c);
 				break;
 			case conn_wclosing:
+				c->thread->stats->curr_clients--;
 				if (c->transport == udp_transport)
 		            conn_cleanup(c);
 		        else
@@ -1114,9 +1114,10 @@ static void thread_libevent_process(int fd, short which, void *arg)
 		        } else 
 		       	{
 		            c->thread = me;
+					c->thread->stats->total_clients++;
+					c->thread->stats->curr_clients++;
 		        }
-
-
+				
 		        cqi_free(item);
 		        break;
 	    }
@@ -1166,7 +1167,7 @@ static void *worker_libevent(void *arg)
 	char thread_name[32] = {0};
     EVENT_THREAD *me = arg;
 
-	sprintf(thread_name,"event_%ld",me - threads + 1);
+	sprintf(thread_name,"event_%d",me - threads + 1);
 	prctl(PR_SET_NAME,thread_name);
 	
     event_base_dispatch(me->base);
@@ -1242,6 +1243,7 @@ void eventbase_thread_init(int nthreads)
     int         power;
 
     threads = calloc(nthreads, sizeof(EVENT_THREAD));
+	server_stats.thread_stat = calloc(nthreads, sizeof(thread_stat_t));
     if (! threads) 
 	{
         perror("Can't allocate thread descriptors");
@@ -1265,7 +1267,7 @@ void eventbase_thread_init(int nthreads)
 		}
         threads[i].notify_receive_fd = fds[0];
         threads[i].notify_send_fd = fds[1];
-
+		threads[i].stats = &server_stats.thread_stat[i];
         setup_thread(&threads[i]);
     }
 

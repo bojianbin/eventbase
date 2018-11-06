@@ -1247,7 +1247,9 @@ int eventbase_get_stats(char *buf,int length)
 	cJSON *root = NULL;
 	cJSON *thread = NULL;
 	cJSON *fld = NULL;
-	
+
+	if(buf == NULL || length <= 0)
+		return -1;
 	root = cJSON_CreateObject();
 	cJSON_AddNumberToObject(root,"maxconns_times",server_stats.maxconns_times);
 	cJSON_AddNumberToObject(root,"maxconns_last_occur",server_stats.maxconns_last_occur);

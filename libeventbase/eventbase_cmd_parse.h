@@ -29,7 +29,7 @@ typedef int parse_status_f;
  *		now may have three ways to write data to socket write buffer
  *     	1:int eventbase_copy_write_date(conn_t *c , void *buf, int len);
  *		2:int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
- *		3:handle wbuf,wcurr,wsize,wbytes directly.this can reduse cpu load in some case
+ *		3:handle wbuf,wcurr,wsize,wbytes directly.this can reduce cpu load in some case
  *		4:change logical model. existing code can not cover all case.espacially mix use method 1 and 2 can 
  *			cause some problem. this may be fixed later.
  *
@@ -41,7 +41,7 @@ typedef int parse_status_f;
  * @return:
  *			PARSE_DONE: 
  				we just parse.no need to write.@parsed_len give length we pass through.
- *			PARSE_DONE_NEED_WRITE:
+ *			PARSE_NEED_WRITE:
  				we just parse.need to write.@parsed_len give length we pass through.
  *			PARSE_ERROR:
  				some fatal error occurs,need to close this client.

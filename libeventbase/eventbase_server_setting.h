@@ -34,7 +34,6 @@ typedef struct
 	int max_connections;
 
 	int max_user_rbuf;
-	int max_mute_time;
 	
 }server_setting_t;
 

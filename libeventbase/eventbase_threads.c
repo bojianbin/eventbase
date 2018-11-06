@@ -482,10 +482,10 @@ static int add_msghdr(conn_t *c)
 	c->msgused += 1;
     return 0;
 }
-void print_s(conn_t *c)
+void print_s(char * pre,conn_t *c)
 {
-	printf("[size:%d used:%d cur:%d bytes:%d]  [iovsize:%d iovused:%d iovcur:%d]\n",
-		c->msgsize,c->msgused,c->msgcurr,c->msgbytes,
+	printf("%s[size:%d used:%d cur:%d bytes:%d]  [iovsize:%d iovused:%d iovcur:%d]\n",
+		pre,c->msgsize,c->msgused,c->msgcurr,c->msgbytes,
 		c->iovsize,c->iovused,c->iovcurr);
 
 	return;
@@ -626,7 +626,7 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
 		
     }
 
-	//print_s(c);
+	//print_s("add",c);
     return 0;
 }
 
@@ -743,9 +743,10 @@ transmit_result_e try_send_mdata(conn_t *c)
 	        struct msghdr *m = &c->msglist[c->msgcurr];
 
 	        res = sendmsg(c->sfd, m, 0);
+			
 	        if (res > 0) 
 			{
-
+				//print_s("before sendmsg", c);
 				c->msgbytes -= res;
 	            /* We've written some of the data. Remove the completed
 	               iovec entries from the list of pending writes. */
@@ -758,7 +759,8 @@ transmit_result_e try_send_mdata(conn_t *c)
 					c->iovused--;
 					c->iovcurr = ( ++c->iovcurr ) % c->iovsize ;
 	            }
-
+				//print_s("before sendmsg", c);
+				
 	            /* Might have written just part of the last iovec entry;
 	               adjust it so the next write will do the rest. */
 	            if (res > 0) 
@@ -769,7 +771,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 	            }
 				c->msgcurr = ( ++c->msgcurr) % c->msgsize ;
 				c->msgused--;
-				
+				//print_s("after sendmsg", c);
 				continue;
 	        }
 	        if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) 
@@ -789,6 +791,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 	    }
 		c->msgcurr = ( ++c->msgcurr ) % c->msgsize;
  	}
+	
 }
 
 void eventbase_add_wevent(conn_t *c)
@@ -797,9 +800,10 @@ void eventbase_add_wevent(conn_t *c)
 		return;
 	if(c->wbytes != 0)
 		c->wstate = conn_write;
-	else
+	else if(c->msglist[c->msgcurr].msg_iovlen > 0)
 		c->wstate = conn_mwrite;
-
+	else
+		return;
 
 	event_assign(&c->wevent, c->thread->base, c->sfd, EV_WRITE | EV_PERSIST , 
 		event_whandler, c);
@@ -814,12 +818,24 @@ void eventbase_delete_wevent(conn_t *c)
 	switch(c->wstate)
 	{
 		case conn_write:
-			c->wstate = conn_mwrite;
-			return;
-		case conn_mwrite:
+			if(c->msglist[c->msgcurr].msg_iovlen > 0)
+			{
+				c->wstate = conn_mwrite;
+				return;
+			}
 			c->wstate = conn_nowrite;
 			event_del(&c->wevent);
 			break;
+		case conn_mwrite:
+			if(c->wbytes != 0)
+			{
+				c->wstate = conn_write;
+				return;
+			}
+			c->wstate = conn_nowrite;
+			event_del(&c->wevent);
+			break;
+
 	}
 	
 	return;

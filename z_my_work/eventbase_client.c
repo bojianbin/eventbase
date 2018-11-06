@@ -108,6 +108,7 @@ void send_udp(char *arg)
 	while((ret = recvfrom(udp_fd,buf,2048,0,(struct sockaddr *)&addr,&len)) > 0)
 	{
 		printf("%s",buf);
+		fflush(stdout);
 		memset(buf,0,2048);
 	}
 	
@@ -135,6 +136,7 @@ void send_tcp(char * arg)
 			i++;
 		}
 		printf("%s",buf);
+		fflush(stdout);
 		memset(buf,0,2048);
 	}	
 
@@ -249,10 +251,7 @@ int main(int argc, char **argv)
 
 		if(strcmp(_argv[0],"connect") == 0)
 		{
-			if(strlen(remote_ip)!=0 && strlen(remote_port) != 0 && 
-				(strcmp(_argv[1],remote_ip) != 0 ||
-				strcmp(_argv[2],remote_port) != 0)
-				)
+			if(tcp_fd > 0)
 			{
 				close(tcp_fd);
 				tcp_fd = -1;
@@ -269,7 +268,7 @@ int main(int argc, char **argv)
 				net_mode = 1 ;//default  tcp mode
 				sprintf(prompt_hits,"%s:%s %s >",remote_ip,remote_port,"tcp");
 			}
-			anetRcvTimeout(NULL, tcp_fd, 3000);
+			anetRcvTimeout(NULL, tcp_fd, 200);
 			//pthread_create(&tcp_thread_id,NULL,tcp_read_thread,NULL);
 		}else if(strcmp(_argv[0],"tcp") == 0)
 		{
@@ -282,7 +281,7 @@ int main(int argc, char **argv)
 			if(udp_fd == -1)
 			{
 				udp_fd = socket(AF_INET,SOCK_DGRAM,0);
-				anetRcvTimeout(NULL, udp_fd, 3000);
+				anetRcvTimeout(NULL, udp_fd, 200);
 				//pthread_create(&udp_thread_id,NULL,udp_read_thread,NULL);
 			}
 		}else if(strcmp(_argv[0],"send") == 0)
@@ -290,7 +289,8 @@ int main(int argc, char **argv)
 			char *pos = NULL;
 			char *ptr = _argv[1];
 			/*;; = \r\n   that's protocol end flag now*/
-			while((pos = strstr(ptr,";;") )!= NULL)
+			while(ptr - _argv[1] < strlen(_argv[1])
+				&& (pos = strstr(ptr,";;") )!= NULL)
 			{
 				*pos++ = '\r';
 				*pos++ = '\n';

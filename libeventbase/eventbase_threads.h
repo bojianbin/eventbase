@@ -184,7 +184,7 @@ typedef struct conn_s
 }conn_t;
 
 
-
+int eventbase_get_stats(char *buf,int length);
 int eventbase_data_init(struct event_base * main_base);
 int eventbase_server_socket(int port,struct event_base *main_base);
 void eventbase_thread_init(int nthreads) ;

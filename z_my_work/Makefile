@@ -8,7 +8,7 @@ TARGET_c = event_client
 FILTER_OUT = ./test_client.o
 OBJ_s = $(patsubst %.c,%.o,$(wildcard ./*.c))
 CFLAGS += 
-LDFLAGS +=  -l:libevent.a -lrt  -l:libeventbase.a -l:libiniparser.a -lpthread
+LDFLAGS +=  -l:libevent.a -lrt  -l:libeventbase.a -l:libiniparser.a -l:libcjson.a -lpthread
 
 OBJ=$(filter-out $(FILTER_OUT),$(OBJ_s))
 

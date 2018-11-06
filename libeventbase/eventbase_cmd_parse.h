@@ -15,17 +15,12 @@ extern "C"
 
 #include "eventbase_threads.h"
 
-typedef enum
-{
-	/*normal case.*/
-	PARSE_DONE,
-	PARSE_DONE_NEED_WRITE,
-	/*fatal error .need close this client*/
-	PARSE_ERROR
-	
-}parse_status_e;
 
-
+/*data parse result. flag set*/
+#define PARSE_DONE 1
+#define PARSE_NEED_WRITE (1<<1)
+#define PARSE_ERROR (1<<2)
+typedef int parse_status_f;
 
 /**
  * protocol parse.fill write buffer and give feedback 
@@ -51,7 +46,7 @@ typedef enum
  *			PARSE_ERROR:
  				some fatal error occurs,need to close this client.
  */
-parse_status_e protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_len);
+parse_status_f protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_len);
 
 
 

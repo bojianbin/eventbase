@@ -18,6 +18,7 @@
 #include "eventbase_cmd_parse.h"
 #include "event2/event.h"
 #include "event2/event_struct.h"
+#include "cJSON.h"
 
 static EVENT_THREAD 	*threads = NULL;
 static server_stat_t   	server_stats;
@@ -831,7 +832,7 @@ void drive_machine(conn_t *c)
 	int parse_len = 0;
 	socklen_t addrlen;
 	read_status_e read_ret;
-	parse_status_e parse_ret;
+	parse_status_f parse_ret ;
     struct sockaddr_storage addr;
 	
 	if(c == NULL)
@@ -912,31 +913,31 @@ void drive_machine(conn_t *c)
 					conn_set_state(c, conn_closing);
 					break;
 				}
-				switch(parse_ret)
+				if(parse_ret & PARSE_ERROR)
 				{
-					case PARSE_DONE_NEED_WRITE:
-						eventbase_add_wevent(c);
-					case PARSE_DONE:
-						conn_set_state(c, conn_read);
-						/*no data in user read buffer*/
-						if(c->read_state != READ_SOME_DATA)	
-							stop = true;
-
-	
-						c->rbytes -= parse_len;
-						c->rcurr += parse_len;
-						if (c->rcurr != c->rbuf) 
-						{
-					        if (c->rbytes != 0) /* otherwise there's nothing to copy */
-					            memmove(c->rbuf, c->rcurr, c->rbytes);
-					        c->rcurr = c->rbuf;
-					    }
-						
-						break;
-					case PARSE_ERROR:
-						conn_set_state(c, conn_closing);
-						break;
+					conn_set_state(c, conn_closing);
+					break;
 				}
+				if(parse_ret & PARSE_NEED_WRITE)
+					eventbase_add_wevent(c);
+				if(parse_ret & PARSE_DONE)
+				{
+					conn_set_state(c, conn_read);
+					/*no data in user read buffer*/
+					if(c->read_state != READ_SOME_DATA)	
+						stop = true;
+
+
+					c->rbytes -= parse_len;
+					c->rcurr += parse_len;
+					if (c->rcurr != c->rbuf) 
+					{
+				        if (c->rbytes != 0) /* otherwise there's nothing to copy */
+				            memmove(c->rbuf, c->rcurr, c->rbytes);
+				        c->rcurr = c->rbuf;
+				    }
+				}
+
 				break;
 
 			case conn_closing:
@@ -1229,7 +1230,43 @@ static void clock_handler(const int fd, const short which, void *arg)
     
 }
 
+/**
+ * print server stats into buf in json format
+ * 
+ * @note: 
+ *		i do not know the situation when length is too small 
+ *
+ * @param[in] buf	 :buffer prealloced
+ * @param[in] length     :the length of buffer
+ * 
+ * @return: 0 if success. -1 if error
+ */
+int eventbase_get_stats(char *buf,int length)
+{
+	int i , ret;
+	cJSON *root = NULL;
+	cJSON *thread = NULL;
+	cJSON *fld = NULL;
+	
+	root = cJSON_CreateObject();
+	cJSON_AddNumberToObject(root,"maxconns_times",server_stats.maxconns_times);
+	cJSON_AddNumberToObject(root,"maxconns_last_occur",server_stats.maxconns_last_occur);
+	cJSON_AddItemToObject(root, "thread", thread = cJSON_CreateArray());
+	
+	for(i = 0 ; i < g_setting.num_work_threads ; i++)
+	{	
+		cJSON_AddItemToArray(thread, fld = cJSON_CreateObject());
+		cJSON_AddNumberToObject(fld,"total_clients",server_stats.thread_stat[i].total_clients);
+		cJSON_AddNumberToObject(fld,"curr_clients",server_stats.thread_stat[i].curr_clients);
+		cJSON_AddNumberToObject(fld,"malloc_fails",server_stats.thread_stat[i].malloc_fails);
+	}
 
+	ret = cJSON_PrintPreallocated(root,buf,length,1);
+
+	cJSON_Delete(root);
+
+	return ret == 1?0:-1;
+}
 /**
  * init structure realated to thread pool .and create the pool
  * 

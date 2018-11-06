@@ -37,6 +37,7 @@
 
 int fd = -1;
 int mode_tcp = 1;
+int mode_stat = 0;
 struct sockaddr_in addr;
 socklen_t len;
 
@@ -59,6 +60,26 @@ void sig_func_udp(int sig)
 
 	return;	
 }
+void sig_func_udp_stat(int sig)
+{
+	int ret ;
+	char *put_str = "stat\r\n";
+
+	addr.sin_family = AF_INET;
+	inet_pton(AF_INET,"127.0.0.1",&addr.sin_addr);
+	addr.sin_port = htons(6737);
+	len = sizeof(addr);
+
+	ret = sendto(fd,put_str,strlen(put_str),0,(struct sockaddr *)&addr,len);
+	if(ret != strlen(put_str))
+	{
+		printf("udp write error\n");
+		exit(-1);
+	}
+
+	return;	
+}
+
 void sig_func(int sig)
 {
 	int ret ;
@@ -92,6 +113,24 @@ void sig_func(int sig)
 	return ;
 }
 
+void sig_func_stat(int sig)
+{
+	int ret ;
+	char *put_str = "stat\r\n";
+
+	
+		;
+	ret = write(fd,put_str,strlen(put_str));
+	if(ret != strlen(put_str))
+	{
+		printf("write error\n");
+		exit(-1);
+	}
+	
+	
+	return ;
+}
+
 void * thread_func(void * arg)
 {
 	while(1)
@@ -108,13 +147,20 @@ void * thread_func(void * arg)
 }
 int main(int argc,char *argv[])
 {
-	char buf[1024] = {0};
+	char buf[2048] = {0};
 	int ret;
 	pthread_t tid;
 
 
-	if(argc == 2 && strcmp(argv[1],"udp") == 0)
+	if(argc >= 2 && strcmp(argv[1],"udp") == 0)
 		mode_tcp = 0;
+	else
+		mode_tcp = 1;
+	if(argc >= 3 && strcmp(argv[2],"stat") == 0)
+		mode_stat = 1;
+	else
+		mode_stat = 0;
+	
 	if(mode_tcp)
 		fd = anetTcpConnect(NULL, "127.0.0.1", 6737);
 	else
@@ -126,28 +172,42 @@ int main(int argc,char *argv[])
 	}
 
 	if(mode_tcp)
-		signal(SIGQUIT,sig_func);
+	{
+		if(!mode_stat)
+			signal(SIGQUIT,sig_func);
+		else
+			signal(SIGQUIT,sig_func_stat);
+	}
 	else
-		signal(SIGQUIT,sig_func_udp);
+	{
+		if(!mode_stat)
+			signal(SIGQUIT,sig_func_udp);
+		else
+			signal(SIGQUIT,sig_func_udp_stat);
+	}
 	
 	srand(time(NULL));
-	
-	pthread_create(&tid,NULL,thread_func,NULL);
+
+	if(!mode_stat)
+		pthread_create(&tid,NULL,thread_func,NULL);
+
 	if(mode_tcp)
 	{
 		int count = 0;
-		while((ret = read(fd,buf,1024)) > 0)
+		while((ret = read(fd,buf,2048)) > 0)
 		{
 			printf("%d -> %s",count++,buf);
-			memset(buf,0,1024);
+			fflush(stdout);
+			memset(buf,0,2048);
 		}
 	}else
 	{
 		int count = 0;
-		while((ret = recvfrom(fd,buf,1024,0,(struct sockaddr *)&addr,&len)) > 0)
+		while((ret = recvfrom(fd,buf,2048,0,(struct sockaddr *)&addr,&len)) > 0)
 		{
-			printf("%d -> %s ",count++,buf);
-			memset(buf,0,1024);
+			printf("%d -> %s",count++,buf);
+			fflush(stdout);
+			memset(buf,0,2048);
 		}
 	}
 	return 0;

@@ -7,12 +7,59 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "eventbase_cmd_parse.h"
+#include "cmd_parse.h"
 
 
+char *ret_world = "world\r\n";
+parse_status_f hello_func(conn_t * c,char *_buf,int len)
+{
+	eventbase_add_write_data(c, ret_world,strlen(ret_world) );
 
-void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen);
+	return (PARSE_NEED_WRITE | PARSE_DONE);
+}
+parse_status_f stat_func(conn_t * c,char *_buf,int len)
+{
+	char *buf  = (char *)calloc(1,2048);
+
+	eventbase_get_stats(buf, 2048);
+	eventbase_copy_write_data(c,buf,strlen(buf));
+
+	free(buf);
+	return (PARSE_NEED_WRITE | PARSE_DONE);
+}
+
+cmd_dict_t cmd_dict[] = 
+{
+	{"hello\r\n",hello_func},
+	{"stat\r\n",stat_func}
+};
+
+void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
+{
+    int needle_first;
+    const void *p = haystack;
+    size_t plen = hlen;
+
+    if (!nlen)
+        return NULL;
+
+    needle_first = *(unsigned char *)needle;
+
+    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
+    {
+        if (!memcmp(p, needle, nlen))
+            return (void *)p;
+
+        p++;
+        plen = hlen - (p - haystack);
+    }
+
+    return NULL;
+}
 
 
 /**
@@ -39,22 +86,31 @@ void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
  *			PARSE_ERROR:
  				some fatal error occurs,need to close this client.
  */
-parse_status_e protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_len)
+parse_status_f protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_len)
 {
-	char *str_find = "hello\r\n";
-	char *ret_world = "world\r\n";
+	int got_one = 1 ;
 	char *ptr = readbuf;
-	char *ret ;
-	parse_status_e retvalue = PARSE_DONE;
+	char *find_pos = NULL;
+	int i,ret;
+	parse_status_f retvalue = PARSE_DONE;
 
 	if(readbuf == NULL || totallen <= 0)
 		goto END;
-	while( ptr < readbuf + totallen && 
-		(ret = memmem(ptr,totallen - (ptr-readbuf),str_find,strlen(str_find)) ) != 0)
+
+
+	while( ptr < readbuf + totallen && got_one == 1)
 	{
-		eventbase_add_write_data(c, ret_world,strlen(ret_world) );
-		ptr = ret + strlen(str_find);
-		retvalue = PARSE_DONE_NEED_WRITE;
+		got_one = 0 ;
+		for(i = 0 ; i < sizeof(cmd_dict)/sizeof(cmd_dict[0]) ; i ++)
+		{
+			if((find_pos = memmem(ptr,totallen - (ptr-readbuf),cmd_dict[i].key_words,strlen(cmd_dict[i].key_words)) ) != 0)
+			{	
+				got_one = 1;
+				ret  = cmd_dict[i].handle(c,find_pos,totallen - (find_pos - readbuf));
+				retvalue |= ret;
+				ptr = find_pos + strlen(cmd_dict[i].key_words);
+			}
+		}
 	}
 	
 	*parsed_len = ptr - readbuf;
@@ -64,26 +120,5 @@ END:
 	return retvalue;
 }
 
-void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
-{
-    int needle_first;
-    const void *p = haystack;
-    size_t plen = hlen;
 
-    if (!nlen)
-        return NULL;
-
-    needle_first = *(unsigned char *)needle;
-
-    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
-    {
-        if (!memcmp(p, needle, nlen))
-            return (void *)p;
-
-        p++;
-        plen = hlen - (p - haystack);
-    }
-
-    return NULL;
-}
 

@@ -4,7 +4,7 @@
 	> Mail: 
 	> Created Time: Thu 01 Nov 2018 10:27:31 AM CST
  ************************************************************************/
-
+/**/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -14,7 +14,7 @@
 #include "cmd_parse.h"
 
 
-char *ret_world = "world\r\n";
+char *ret_world = "world";
 parse_status_f hello_func(conn_t * c,char *_buf,int len)
 {
 	eventbase_add_write_data(c, ret_world,strlen(ret_world) );
@@ -31,11 +31,38 @@ parse_status_f stat_func(conn_t * c,char *_buf,int len)
 	free(buf);
 	return (PARSE_NEED_WRITE | PARSE_DONE);
 }
+parse_status_f string_func(conn_t * c,char *_buf,int len)
+{
+	static char *str_sore = "abcdefghijklmnopqrstuvwxyz";
+	char * ptr = _buf + strlen("string");
+	int str_len = 0;
+	int ret ,line_len;
+
+
+	ret = sscanf(ptr,"%d",&str_len);
+	//printf("%d %d\n",ret , str_len);
+	if(ret <= 0)
+		return PARSE_ERROR;
+
+	while(str_len / strlen(str_sore) >= 1)
+	{
+		eventbase_add_write_data(c, str_sore,strlen(str_sore) );
+		str_len -=  strlen(str_sore);
+	}
+	if(str_len > 0)
+	{
+		eventbase_add_write_data(c, str_sore,str_len );
+	}
+
+	return PARSE_DONE | PARSE_NEED_WRITE ;
+	
+}
 
 cmd_dict_t cmd_dict[] = 
 {
-	{"hello\r\n",hello_func},
-	{"stat\r\n",stat_func}
+	{"hello",hello_func},			/*hello\r\n\r\n*/
+	{"stat",stat_func},				/*stat\r\n\r\n*/
+	{"string",string_func}			/*string n\r\n\r\n*/
 };
 
 void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
@@ -88,34 +115,44 @@ void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
  */
 parse_status_f protocol_parse(conn_t * c,char *readbuf,int totallen,int *parsed_len)
 {
-	int got_one = 1 ;
+	int find_one = 0;
 	char *ptr = readbuf;
-	char *find_pos = NULL;
 	int i,ret;
 	parse_status_f retvalue = PARSE_DONE;
+	char *end_pos = NULL;
 
+	*parsed_len = 0;
 	if(readbuf == NULL || totallen <= 0)
 		goto END;
 
-
-	while( ptr < readbuf + totallen && got_one == 1)
+	//printf("totallen:%d\n",totallen);
+	while( ptr < readbuf + totallen && 
+				(end_pos = memmem(ptr,totallen - (ptr - readbuf),"\r\n\r\n",4)) != NULL)
 	{
-		got_one = 0 ;
+		find_one = 0;
 		for(i = 0 ; i < sizeof(cmd_dict)/sizeof(cmd_dict[0]) ; i ++)
 		{
-			if((find_pos = memmem(ptr,totallen - (ptr-readbuf),cmd_dict[i].key_words,strlen(cmd_dict[i].key_words)) ) != 0)
+			if(memmem(ptr,totallen - (ptr-readbuf),cmd_dict[i].key_words,strlen(cmd_dict[i].key_words) ) != 0)
 			{	
-				got_one = 1;
-				ret  = cmd_dict[i].handle(c,find_pos,totallen - (find_pos - readbuf));
+				find_one = 1;
+				end_pos += 4;
+				ret  = cmd_dict[i].handle(c,ptr,end_pos - ptr );
 				retvalue |= ret;
-				ptr = find_pos + strlen(cmd_dict[i].key_words);
+				ptr = end_pos;
+
 			}
+		}
+
+		//can not find any cmd key
+		if(find_one == 0)
+		{
+			ptr = end_pos + 4;
 		}
 	}
 	
-	*parsed_len = ptr - readbuf;
-	//printf("parse %d %d  %d\n",totallen,*parsed_len,c->rbytes);
+	*parsed_len = ptr - readbuf ;
 
+	//printf("parsed_len:%d\n",*parsed_len);
 END:
 	return retvalue;
 }

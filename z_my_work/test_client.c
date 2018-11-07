@@ -44,7 +44,7 @@ socklen_t len;
 void sig_func_udp(int sig)
 {
 	int ret ;
-	char *put_str = "hello\r\nhello\r\n";
+	char *put_str = "hello\r\n\r\nhello\r\n\r\n";
 
 	addr.sin_family = AF_INET;
 	inet_pton(AF_INET,"127.0.0.1",&addr.sin_addr);
@@ -63,7 +63,7 @@ void sig_func_udp(int sig)
 void sig_func_udp_stat(int sig)
 {
 	int ret ;
-	char *put_str = "stat\r\n";
+	char *put_str = "stat\r\n\r\n";
 
 	addr.sin_family = AF_INET;
 	inet_pton(AF_INET,"127.0.0.1",&addr.sin_addr);
@@ -84,12 +84,12 @@ void sig_func(int sig)
 {
 	int ret ;
 	static int pos = -1;
-	char *put_str = "hello\r\nhello\r\n";
+	char *put_str = "hello\r\n\r\nhello\r\n\r\n";
 
 	if(pos == -1)
 	{
 		
-		pos = rand() % 14 ;
+		pos = rand() % strlen(put_str) ;
 		ret = write(fd,put_str,pos);
 		if(ret != pos)
 		{
@@ -116,7 +116,7 @@ void sig_func(int sig)
 void sig_func_stat(int sig)
 {
 	int ret ;
-	char *put_str = "stat\r\n";
+	char *put_str = "stat\r\n\r\n";
 
 	
 		;
@@ -140,7 +140,7 @@ void * thread_func(void * arg)
 		else
 			sig_func_udp(0);
 		
-		usleep(10000);
+		usleep(5000);
 	}
 
 	return NULL;

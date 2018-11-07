@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
+#include <errno.h>
 
 #include "eventbase_anet.h"
 
@@ -41,6 +42,7 @@
 int net_mode = -1;
 int tcp_fd = -1;
 int udp_fd = -1;
+int rcvtimeout = 200;
 char  remote_ip[128];
 char  remote_port[128];
 char prompt_hits[128];
@@ -83,11 +85,42 @@ char ** c_split_args(char *_str,int *_argc)
 	return ret_array;
 	
 }
+char *packet_data(int argc,char **argv)
+{
+	int i = 0 ;
+	char *ptr ;
 
-void send_udp(char *arg)
+
+	char *buf = (char *)calloc(1,2048);
+	if(!buf)
+	{
+		printf("mallloc error\n");
+		exit(0);
+	}
+	for(i = 0 ; i < argc - 1 ; i++)
+	{
+		strcat(buf,argv[i + 1]);
+		if(i != argc - 1 - 1)
+			strcat(buf, " ");
+	}
+
+	/*;; = \r\n   that's protocol end flag now*/
+	for(ptr = buf ; ptr < buf + strlen(buf) ; ptr++)
+	{	
+		if(*ptr == '<') 
+			*ptr = '\r';
+		if(*ptr == '>') 
+			*ptr = '\n';
+	}
+	
+
+	return buf;
+}
+
+void send_udp(int argc , char **argv)
 {
 	int ret ;
-	char buf[2048] = {0};
+	char *buf = NULL;
 
 	if(strlen(remote_ip) == 0 || strlen(remote_port) == 0)
 	{
@@ -99,33 +132,40 @@ void send_udp(char *arg)
 	addr.sin_port = htons(atoi(remote_port));
 	len = sizeof(addr);
 
-	ret = sendto(udp_fd,arg,strlen(arg),0,(struct sockaddr *)&addr,len);
-	if(ret != strlen(arg))
+	buf = packet_data(argc, argv);
+	ret = sendto(udp_fd,buf,strlen(buf),0,(struct sockaddr *)&addr,len);
+	if(ret != strlen(buf))
 	{
 		printf("udp write error\n");
 	}
-
+	memset(buf,0,2048);
 	while((ret = recvfrom(udp_fd,buf,2048,0,(struct sockaddr *)&addr,&len)) > 0)
 	{
 		printf("%s",buf);
 		fflush(stdout);
 		memset(buf,0,2048);
 	}
-	
+
+	free(buf);
 	return;	
 }
-void send_tcp(char * arg)
+
+
+void send_tcp(int argc,char **argv)
 {
 	int ret;
+	char *buf = NULL;
 
 	if(tcp_fd < 0)return;
-	ret = write(tcp_fd,arg,strlen(arg));
-	if(ret != strlen(arg))
+
+	buf = packet_data(argc, argv);
+	ret = write(tcp_fd,buf,strlen(buf));
+	if(ret != strlen(buf))
 	{
 		printf("tcp write error\n");
+		goto END;
 	}
-
-	char buf[2048] = {0};
+	memset(buf,0,2048);
 	while((ret = read(tcp_fd,buf,2048)) > 0)
 	{	
 		int i = 0;
@@ -140,7 +180,14 @@ void send_tcp(char * arg)
 		memset(buf,0,2048);
 	}	
 
-	return;
+END:
+	if(buf)
+		free(buf);
+	if(ret < 0 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
+		return;
+	close(tcp_fd);
+	tcp_fd = anetTcpConnect(NULL, remote_ip, atoi(remote_port));
+	anetRcvTimeout(NULL, tcp_fd, rcvtimeout);
 }
 void *udp_read_thread(void * arg)
 {
@@ -200,6 +247,14 @@ void completion(const char *buf, linenoiseCompletions *lc)
 	{
         linenoiseAddCompletion(lc,"udp");
     }
+	if (buf[0] == 'r') 
+	{
+        linenoiseAddCompletion(lc,"rcvtimeout ");
+    }
+	if (buf[0] == 'h') 
+	{
+        linenoiseAddCompletion(lc,"help");
+    }
 }
 
 char *hints(const char *buf, int *color, int *bold) 
@@ -221,7 +276,7 @@ int main(int argc, char **argv)
 	char **_argv = NULL;
 	int _argc = 0;
 
-
+	signal(SIGPIPE,SIG_IGN);
 	linenoiseSetMultiLine(1);
     /* Set the completion callback. This will be called every time the
      * user uses the <tab> key. */
@@ -268,7 +323,7 @@ int main(int argc, char **argv)
 				net_mode = 1 ;//default  tcp mode
 				sprintf(prompt_hits,"%s:%s %s >",remote_ip,remote_port,"tcp");
 			}
-			anetRcvTimeout(NULL, tcp_fd, 200);
+			anetRcvTimeout(NULL, tcp_fd, rcvtimeout);
 			//pthread_create(&tcp_thread_id,NULL,tcp_read_thread,NULL);
 		}else if(strcmp(_argv[0],"tcp") == 0)
 		{
@@ -281,27 +336,26 @@ int main(int argc, char **argv)
 			if(udp_fd == -1)
 			{
 				udp_fd = socket(AF_INET,SOCK_DGRAM,0);
-				anetRcvTimeout(NULL, udp_fd, 200);
+				anetRcvTimeout(NULL, udp_fd, rcvtimeout);
 				//pthread_create(&udp_thread_id,NULL,udp_read_thread,NULL);
 			}
 		}else if(strcmp(_argv[0],"send") == 0)
 		{
-			char *pos = NULL;
-			char *ptr = _argv[1];
-			/*;; = \r\n   that's protocol end flag now*/
-			while(ptr - _argv[1] < strlen(_argv[1])
-				&& (pos = strstr(ptr,";;") )!= NULL)
-			{
-				*pos++ = '\r';
-				*pos++ = '\n';
-				ptr = pos;
-			}
+
 			if(net_mode == 1)
-				send_tcp(_argv[1]);
+			{
+				send_tcp(_argc,_argv);
+				printf("\n");
+			}
 			else if(net_mode == 2)
-				send_udp(_argv[1]);
+			{
+				send_udp(_argc,_argv);
+				printf("\n");
+			}
 			else
+			{
 				printf("unconnected\n");
+			}
 		}else if(strcmp(_argv[0],"quit") == 0 || strcmp(_argv[0],"exit") == 0)
 		{
 			printf("Quit now!\n");
@@ -309,6 +363,29 @@ int main(int argc, char **argv)
 		}else if(strcmp(_argv[0],"clear") == 0 )
 		{
 			linenoiseClearScreen();
+		}else if(strcmp(_argv[0],"rcvtimeout") == 0 )
+		{
+			if(_argc >= 2)
+			{
+				if(tcp_fd >= 0)
+					anetRcvTimeout(NULL, tcp_fd, atoi(_argv[1]));
+				if(udp_fd >= 0)
+					anetRcvTimeout(NULL, udp_fd, atoi(_argv[1]));
+				rcvtimeout = atoi(_argv[1]);
+			}else
+			{
+				printf("Now rcvtimeout %d ms\n",rcvtimeout);
+			}
+		}
+		else if(strcmp(_argv[0],"help") == 0)
+		{
+			printf("connect [ip] [port]\tconnect remote server.tcp mode default\n");
+			printf("send [data]\tsend [data] to server,';;' means '\\r\\n'\n");
+			printf("rcvtimeout [time]\t set socket max rcv time.in million seconds\n");
+			printf("clear [data]\tclear screen\n");
+			printf("tcp\ttcp mode\n");
+			printf("udp\tudp mode\n");
+			printf("exit or quit\texit this client\n");
 		}else
 		{
 			printf("unrecognized command\n");

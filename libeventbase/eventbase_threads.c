@@ -384,7 +384,7 @@ read_status_e try_read_udp(conn_t *c)
 	}
 	else
 	{
-		return READ_DATA_DONE;
+		return READ_NONE;
 	}
 	return READ_NONE;
 }
@@ -734,14 +734,17 @@ transmit_result_e try_send_data(conn_t *c)
 
 transmit_result_e try_send_mdata(conn_t *c) 
 {
-
+	int in_send_mdata = 0;
+	
  	while(1)
  	{
 	    if (c->msgused > 0 && c->msglist[c->msgcurr].msg_iovlen > 0) 
 		{
+			int i = 0;
 	        ssize_t res;
 	        struct msghdr *m = &c->msglist[c->msgcurr];
 
+			in_send_mdata = 1;
 	        res = sendmsg(c->sfd, m, 0);
 			
 	        if (res > 0) 
@@ -772,6 +775,11 @@ transmit_result_e try_send_mdata(conn_t *c)
 				c->msgcurr = ( ++c->msgcurr) % c->msgsize ;
 				c->msgused--;
 				//print_s("after sendmsg", c);
+				c->msgbytes = 0;
+				for(i = 0 ; i < c->msglist[c->msgcurr].msg_iovlen ; i++)
+				{
+					c->msgbytes += c->msglist[c->msgcurr].msg_iov[i].iov_len;
+				}
 				continue;
 	        }
 	        if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) 
@@ -784,9 +792,12 @@ transmit_result_e try_send_mdata(conn_t *c)
 	        return TRANSMIT_ERROR;
 	    } else 
 		{
-			c->msgcurr--;
-			c->msgused++;
-			if(c->msgcurr < 0) c->msgcurr = c->msgsize - 1;
+			if(in_send_mdata > 0)
+			{
+				c->msgcurr--;
+				c->msgused++;
+				if(c->msgcurr < 0) c->msgcurr = c->msgsize - 1;
+			}
 	        return TRANSMIT_COMPLETE;
 	    }
 		c->msgcurr = ( ++c->msgcurr ) % c->msgsize;
@@ -902,7 +913,6 @@ void drive_machine(conn_t *c)
 					read_ret = try_read_udp(c);
 				else
 					read_ret = try_read_network(c);
-				
 				c->read_state = read_ret;
 				switch (read_ret) 
 				{
@@ -943,15 +953,22 @@ void drive_machine(conn_t *c)
 					if(c->read_state != READ_SOME_DATA)	
 						stop = true;
 
-
-					c->rbytes -= parse_len;
-					c->rcurr += parse_len;
-					if (c->rcurr != c->rbuf) 
+					if(c->transport == udp_transport)
 					{
-				        if (c->rbytes != 0) /* otherwise there's nothing to copy */
-				            memmove(c->rbuf, c->rcurr, c->rbytes);
-				        c->rcurr = c->rbuf;
-				    }
+						c->rcurr = c->rbuf;
+						c->rbytes = 0;
+						
+					}else if(c->transport == tcp_transport)
+					{
+						c->rbytes -= parse_len;
+						c->rcurr += parse_len;
+						if (c->rcurr != c->rbuf) 
+						{
+					        if (c->rbytes != 0) /* otherwise there's nothing to copy */
+					            memmove(c->rbuf, c->rcurr, c->rbytes);
+					        c->rcurr = c->rbuf;
+					    }
+					}
 				}
 
 				break;

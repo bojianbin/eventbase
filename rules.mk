@@ -2,6 +2,7 @@
 #for example
 #arm-hisiv300-linux- 	(if hisi)
 #- 						(if gcc)
+#... ...
 TARGET_CROSS_COMPILE:=-
 
 

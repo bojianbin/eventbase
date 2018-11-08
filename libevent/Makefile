@@ -17,6 +17,7 @@ prepare:
 ifeq ($(wildcard $(EVENT_DIR)),)
 	tar -zxf $(TARGET).tar.gz 
 	cd libevent-2.1.8-stable && ./configure --prefix=$(BUILD_DIR) \
+		--disable-openssl \
 		--enable-shared \
 		--enable-static \
 		--build=$(shell uname -m)-linux-gnu \

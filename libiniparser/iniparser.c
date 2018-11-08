@@ -732,7 +732,7 @@ dictionary * iniparser_load(const char * ininame)
 	struct flock file_rd_lock = {F_RDLCK,SEEK_SET,0,0,0};
 
     if ((in=fopen(ininame, "r"))==NULL) {
-        iniparser_error_callback("iniparser: cannot open %s\n", ininame);
+        //iniparser_error_callback("iniparser: cannot open %s\n", ininame);
         return NULL ;
     }
 	fcntl(fileno(in),F_SETLKW,&file_rd_lock);

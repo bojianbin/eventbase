@@ -29,7 +29,7 @@ int main()
 	setting_read(&g_setting);
 
 	sigignore(SIGPIPE);
-	//daemonize(0,0);
+	daemonize(0,0);
 	adjust_max_fd(g_setting.max_connections);
 	
 	ev_config = event_config_new();

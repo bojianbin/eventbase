@@ -944,6 +944,11 @@ void drive_machine(conn_t *c)
 					conn_set_state(c, conn_closing);
 					break;
 				}
+				if(c->rbytes >= c->rsize && parse_len == 0)
+				{
+					conn_set_state(c, conn_closing);
+					break;
+				}
 				if(parse_ret & PARSE_NEED_WRITE)
 					eventbase_add_wevent(c);
 				if(parse_ret & PARSE_DONE)

@@ -30,13 +30,14 @@ typedef int parse_status_f;
  *     	1:int eventbase_copy_write_date(conn_t *c , void *buf, int len);
  *		2:int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
  *		3:handle wbuf,wcurr,wsize,wbytes directly.this can reduce cpu load in some case
- *		4:change logical model. existing code can not cover all case.espacially mix use method 1 and 2 can 
+ *		
+ *		may change logical model. existing code can not cover all cases.espacially mix use method 1 and 2 can 
  *			cause some problem. this may be fixed later.
  *
  * @param[in] c				:user main structure
  * @param[in] readbuf		:readbuffer filled with unparsed data
  * @param[in] totallen		:the unparsed readbuffer length
- * @param[out] totallen		:readbuf size we parsed this time
+ * @param[out] parsed_len	:readbuf size we parsed this time
  *
  * @return:
  *			PARSE_DONE: 

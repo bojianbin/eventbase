@@ -4,7 +4,14 @@
 	> Mail: 
 	> Created Time: Thu 01 Nov 2018 10:27:31 AM CST
  ************************************************************************/
-/**/
+/*
+* a simple demo with libeventbase
+* protocol:
+*		hello\r\n\r\n    	server return string :world
+*		stat\r\n\r\n		server return one json string about server status
+*		string n\r\n\r\n	server return one n length string
+*
+*/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -97,13 +104,14 @@ void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
  *     	1:int eventbase_copy_write_date(conn_t *c , void *buf, int len);
  *		2:int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
  *		3:handle wbuf,wcurr,wsize,wbytes directly.this can reduse cpu load in some case
- *		4:change logical model. existing code can not cover all case.espacially mix use method 1 and 2 can 
- *			cause some problem. this may be fixed later.
+ *		
+ *		may need change logical model. existing code can not cover all case.espacially mix use method 1 and 2 can 
+ *		cause some problem. this may be fixed later.
  *
  * @param[in] c				:user main structure
  * @param[in] readbuf		:readbuffer filled with unparsed data
  * @param[in] totallen		:the unparsed readbuffer length
- * @param[out] totallen		:readbuf size we parsed this time
+ * @param[out] parsed_len	:readbuf size we parsed this time
  *
  * @return:
  *			PARSE_DONE: 

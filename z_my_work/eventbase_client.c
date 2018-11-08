@@ -379,13 +379,13 @@ int main(int argc, char **argv)
 		}
 		else if(strcmp(_argv[0],"help") == 0)
 		{
-			printf("connect [ip] [port]\tconnect remote server.tcp mode default\n");
-			printf("send [data]\tsend [data] to server,';;' means '\\r\\n'\n");
-			printf("rcvtimeout [time]\t set socket max rcv time.in million seconds\n");
-			printf("clear [data]\tclear screen\n");
-			printf("tcp\ttcp mode\n");
-			printf("udp\tudp mode\n");
-			printf("exit or quit\texit this client\n");
+			printf("connect [ip] [port]\t->connect remote server.tcp mode default\n");
+			printf("send [data]\t->send [data] to server,'<>' means '\\r\\n'\n");
+			printf("rcvtimeout [time]\t ->set socket max rcv time.in million seconds\n");
+			printf("clear [data]\t->clear screen\n");
+			printf("tcp\t->tcp mode\n");
+			printf("udp\t->udp mode\n");
+			printf("exit or quit\t->exit this client\n");
 		}else
 		{
 			printf("unrecognized command\n");

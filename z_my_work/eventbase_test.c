@@ -37,11 +37,11 @@
 
 int fd = -1;
 int mode_tcp = 1;
-int mode_stat = 0;
+int mode_stat = 0; //0:hello   1: stat   2:string
 struct sockaddr_in addr;
 socklen_t len;
 
-void sig_func_udp(int sig)
+void sig_func_udp_hello(int sig)
 {
 	int ret ;
 	char *put_str = "hello\r\n\r\nhello\r\n\r\n";
@@ -79,8 +79,33 @@ void sig_func_udp_stat(int sig)
 
 	return;	
 }
+void sig_func_udp_string(int sig)
+{
+	int ret ;
+	static int num = 0;
+	char buf[128] = {0};
+	char *put_str = "string %d\r\n\r\n";
 
-void sig_func(int sig)
+	addr.sin_family = AF_INET;
+	inet_pton(AF_INET,"127.0.0.1",&addr.sin_addr);
+	addr.sin_port = htons(6737);
+	len = sizeof(addr);
+
+	num++;
+	sprintf(buf,put_str,num);
+	ret = sendto(fd,buf,strlen(buf),0,(struct sockaddr *)&addr,len);
+	if(num >= 10)
+		num = 0;
+	if(ret != strlen(buf))
+	{
+		printf("udp write error\n");
+		exit(-1);
+	}
+
+	return;	
+}
+
+void sig_func_hello(int sig)
 {
 	int ret ;
 	static int pos = -1;
@@ -130,16 +155,60 @@ void sig_func_stat(int sig)
 	
 	return ;
 }
+void sig_func_string(int sig)
+{
+	int ret ;
+	static int num = 0;
+	char buf[128] = {0};
+	char *put_str = "string %d\r\n\r\n";
+
+
+	num++;
+	sprintf(buf,put_str,num);
+	ret = write(fd,buf,strlen(buf));
+	if(num >= 10)
+		num = 0;
+	if(ret != strlen(buf))
+	{
+		printf("write error\n");
+		exit(-1);
+	}
+
+	return;	
+}
 
 void * thread_func(void * arg)
 {
 	while(1)
 	{
 		if(mode_tcp)
-			sig_func(0);
+		{
+			switch(mode_stat)
+			{
+				case 0:
+					sig_func_hello(0);
+					break;
+				case 1:
+					break;
+				case 2:
+					sig_func_string(0);
+					break;
+			}
+		}
 		else
-			sig_func_udp(0);
-		
+		{
+			switch(mode_stat)
+			{
+				case 0:
+					sig_func_udp_hello(0);
+					break;
+				case 1:
+					break;
+				case 2:
+					sig_func_udp_string(0);
+					break;
+			}
+		}
 		usleep(5000);
 	}
 
@@ -156,8 +225,11 @@ int main(int argc,char *argv[])
 		mode_tcp = 0;
 	else
 		mode_tcp = 1;
+	
 	if(argc >= 3 && strcmp(argv[2],"stat") == 0)
 		mode_stat = 1;
+	else if(argc >= 3 && strcmp(argv[2],"string") == 0)
+		mode_stat = 2;
 	else
 		mode_stat = 0;
 	
@@ -173,31 +245,29 @@ int main(int argc,char *argv[])
 
 	if(mode_tcp)
 	{
-		if(!mode_stat)
-			signal(SIGQUIT,sig_func);
-		else
-			signal(SIGQUIT,sig_func_stat);
+
+		signal(SIGQUIT,sig_func_stat);
 	}
 	else
 	{
-		if(!mode_stat)
-			signal(SIGQUIT,sig_func_udp);
-		else
-			signal(SIGQUIT,sig_func_udp_stat);
+
+		signal(SIGQUIT,sig_func_udp_stat);
 	}
 	
 	srand(time(NULL));
 
-	if(!mode_stat)
+	if(mode_stat != 1)//not stat
 		pthread_create(&tid,NULL,thread_func,NULL);
 
 	if(mode_tcp)
 	{
-		int count = 0;
 		while((ret = read(fd,buf,2048)) > 0)
 		{
-			printf("%d -> %s",count++,buf);
-			fflush(stdout);
+			printf("%s",buf);
+			if(mode_stat == 2)
+				printf("\n");
+			else
+				fflush(stdout);
 			memset(buf,0,2048);
 		}
 	}else
@@ -205,11 +275,16 @@ int main(int argc,char *argv[])
 		int count = 0;
 		while((ret = recvfrom(fd,buf,2048,0,(struct sockaddr *)&addr,&len)) > 0)
 		{
-			printf("%d -> %s",count++,buf);
-			fflush(stdout);
+			printf("%s",buf);
+			if(mode_stat == 2)
+				printf("\n");
+			else
+				fflush(stdout);
 			memset(buf,0,2048);
 		}
 	}
 	return 0;
 }
+
+
 

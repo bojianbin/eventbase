@@ -6,7 +6,7 @@ include ${TOP_DIR}/rules.mk
 TARGET = event
 TARGET_c = eventbase_test
 TARGET_c2 = eventbase_client
-FILTER_OUT = ./test_client.o ./eventbase_client.o
+FILTER_OUT = ./eventbase_test.o ./eventbase_client.o
 OBJ_s = $(patsubst %.c,%.o,$(wildcard ./*.c))
 CFLAGS += 
 LDFLAGS +=  -l:libevent.a -lrt  -l:libeventbase.a -l:libiniparser.a -l:libcjson.a -l:liblinenoise.a -lpthread
@@ -21,7 +21,7 @@ target:$(OBJ)
 	@$(TARGET_CC) -o $(TARGET) $(OBJ) $(CFLAGS) $(LDFLAGS)
 	
 client:$(FILTER_OUT) 
-	@$(TARGET_CC) -o $(TARGET_c) ./test_client.o  $(CFLAGS) $(LDFLAGS)
+	@$(TARGET_CC) -o $(TARGET_c) ./eventbase_test.o  $(CFLAGS) $(LDFLAGS)
 	@$(TARGET_CC) -o $(TARGET_c2) ./eventbase_client.o  $(CFLAGS) $(LDFLAGS)
 
 

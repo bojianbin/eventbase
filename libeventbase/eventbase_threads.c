@@ -575,7 +575,7 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
             /* We may need to start a new msghdr if this one is full. */
             if (m->msg_iovlen == IOV_MAX ||
                 (c->msgbytes >= UDP_MAX_PAYLOAD_SIZE) ||
-                 c->iovcurr + c->iovused >= c->iovsize) //iov can not wrap in an msghdr
+                 c->iovcurr + c->iovused == c->iovsize) //iov can not wrap in an msghdr
            	{
                 ret = add_msghdr(c);
 				if(ret < 0)
@@ -610,7 +610,7 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
 		
         /* Optimized path for TCP connections */
         m = &c->msglist[ (c->msgcurr + c->msgused - 1) % c->msgsize ];
-        if (m->msg_iovlen == IOV_MAX || c->iovcurr + c->iovused >= c->iovsize) 
+        if (m->msg_iovlen == IOV_MAX || c->iovcurr + c->iovused == c->iovsize) 
 		{
             ret = add_msghdr(c);
 			if(ret < 0)

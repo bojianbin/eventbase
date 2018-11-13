@@ -1,4 +1,4 @@
-_TOPDIR:=$(word 1, $(subst /libevent, ,$(shell pwd)))
+_TOPDIR:=$(word 1, $(subst /deps/libevent, ,$(shell pwd)))
 TOP_DIR:=${_TOPDIR}
 
 TARGET=libevent-2.1.8-stable

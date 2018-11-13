@@ -1,5 +1,5 @@
 
-_TOPDIR:=$(word 1, $(subst /libiniparser, ,$(shell pwd)))
+_TOPDIR:=$(word 1, $(subst /deps/libiniparser, ,$(shell pwd)))
 TOP_DIR:=${_TOPDIR}
 include $(TOP_DIR)/rules.mk
 

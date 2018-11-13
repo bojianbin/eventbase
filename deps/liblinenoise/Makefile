@@ -1,4 +1,4 @@
-_TOPDIR:=$(word 1, $(subst /liblinenoise, ,$(shell pwd)))
+_TOPDIR:=$(word 1, $(subst /deps/liblinenoise, ,$(shell pwd)))
 TOP_DIR:=${_TOPDIR}
 include $(TOP_DIR)/rules.mk
 

@@ -20,7 +20,7 @@
 #include "event2/event_struct.h"
 #include "cJSON.h"
 
-static EVENT_THREAD 	*threads = NULL;
+static event_thread_t 	*threads = NULL;
 static server_stat_t   	server_stats;
 
 conn_t **conns = NULL;
@@ -264,7 +264,6 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
     c->last_cmd_time = current_time; /* initialize for idle kicker */
 
     event_assign(&c->event, base,sfd, event_flags, event_handler, (void *)c);
-    c->ev_flags = event_flags;
 
     if (event_add(&c->event, NULL) == -1) 
 	{
@@ -310,6 +309,8 @@ static void conn_cleanup(conn_t *c)
 
 static void conn_close(conn_t *c) 
 {
+	int i = 0;
+	
     if(c == NULL)
 		return;
 
@@ -317,6 +318,19 @@ static void conn_close(conn_t *c)
     event_del(&c->event);
 	if(c->wstate == conn_write || c->wstate == conn_mwrite)
 		event_del(&c->wevent);
+	/*clear time event*/
+	for(i = 0 ; i < TIMER_EVENT_NUM ; i++)
+	{
+		if(c->timeevent[i] != NULL)
+		{
+			event_del(c->timeevent[i]);
+			event_free(c->timeevent[i]);
+			c->timeevent[i] = NULL;
+		}
+	}
+
+	/*if any*/
+	c->user_data = NULL ; 
     conn_cleanup(c);
 
     conn_set_state(c, conn_closed);
@@ -349,7 +363,7 @@ void dispatch_conn_new(int sfd, conn_states_e init_state, int event_flags,
 
     int tid = (last_thread + 1) % g_setting.num_work_threads;
 
-    EVENT_THREAD *thread = threads + tid;
+    event_thread_t *thread = threads + tid;
 
     last_thread = tid;
 
@@ -1079,7 +1093,6 @@ void event_whandler(const int fd, const short which, void *arg)
 
     c = (conn_t *)arg;
 
-    c->which = which;
 
     /* sanity */
     if (fd != c->sfd) 
@@ -1100,7 +1113,6 @@ void event_handler(const int fd, const short which, void *arg)
 
     c = (conn_t *)arg;
 
-    c->which = which;
 
     /* sanity */
     if (fd != c->sfd) 
@@ -1122,7 +1134,7 @@ void event_handler(const int fd, const short which, void *arg)
  */
 static void thread_libevent_process(int fd, short which, void *arg) 
 {
-    EVENT_THREAD *me = arg;
+    event_thread_t *me = arg;
     conn_queue_item_t *item;
     char buf[1];
     conn_t *c;
@@ -1167,7 +1179,7 @@ static void thread_libevent_process(int fd, short which, void *arg)
     }
 }
 
-static void setup_thread(EVENT_THREAD *me) 
+static void setup_thread(event_thread_t *me) 
 {
     struct event_config *ev_config;
     ev_config = event_config_new();
@@ -1208,7 +1220,7 @@ static void setup_thread(EVENT_THREAD *me)
 static void *worker_libevent(void *arg) 
 {
 	char thread_name[32] = {0};
-    EVENT_THREAD *me = arg;
+    event_thread_t *me = arg;
 
 	sprintf(thread_name,"event_%d",(int)(me - threads + 1));
 	prctl(PR_SET_NAME,thread_name);
@@ -1227,7 +1239,7 @@ static void create_worker(void *(*func)(void *), void *arg)
 
     pthread_attr_init(&attr);
 
-    if ((ret = pthread_create(&((EVENT_THREAD*)arg)->thread_id, &attr, func, arg)) != 0) 
+    if ((ret = pthread_create(&((event_thread_t*)arg)->thread_id, &attr, func, arg)) != 0) 
 	{
         perror("Can't create thread");
         exit(1);
@@ -1266,6 +1278,68 @@ static void clock_handler(const int fd, const short which, void *arg)
     current_time = (unsigned int)ts.tv_sec - monotonic_start;
     return;
     
+}
+
+/**
+ * delete time event to thread loop
+ * 
+ * @note: 
+ *		
+ *
+ * @param[in] c	 		:client structure
+ * @param[in] _arg     	:timeevent identifier
+ *
+ * @return:  0 if success .-1 if error
+ */
+int eventbase_delete_time_event(conn_t *c,timeevent_handle _arg      )
+{
+	if(_arg < 0 || _arg >= TIMER_EVENT_NUM || c == NULL)
+		return -1;
+
+	if(c->timeevent[_arg] == NULL)
+		return 0;
+
+	event_del(c->timeevent[_arg]);
+	event_free(c->timeevent[_arg]);
+	c->timeevent[_arg] = NULL;
+
+	return 0;
+}
+/**
+ * add time event to thread loop
+ * 
+ * @note: 
+ *		this makes event persistent until eventbase_delete_time_event() is called.
+ *
+ * @param[in] c	 		:client structure
+ * @param[in] millionsec     :the time to wait for callback fires
+ * @param[in] func     	:callback
+ *
+ * @return: identifier for a certain event,which is in range [0 ... ... TIMER_EVENT_NUM - 1] .
+ *			-1 if error
+ */
+timeevent_handle eventbase_add_time_event(conn_t *c, int millionsec,_event_callback func)
+{
+	int i = 0 ;
+	struct timeval _sec;
+
+	if(c == NULL) return -1;
+	for(i = 0 ; i < TIMER_EVENT_NUM ; i++)
+	{
+		if(c->timeevent[i] == NULL)
+			break;
+	}
+	/*only TIMER_EVENT_NUM time events we can add*/
+	if(i >= TIMER_EVENT_NUM)
+		return -1;
+
+	_sec.tv_sec = millionsec / 1000 ;
+	_sec.tv_usec = millionsec % 1000 * 1000 ;
+	c->timeevent[i] = event_new(c->thread->base,-1,EV_PERSIST,func,c);
+
+	event_add(c->timeevent[i],&_sec);
+	
+	return i;
 }
 
 /**
@@ -1323,7 +1397,7 @@ void eventbase_thread_init(int nthreads)
 	int 		ret ;
     int         power;
 
-    threads = calloc(nthreads, sizeof(EVENT_THREAD));
+    threads = calloc(nthreads, sizeof(event_thread_t));
 	server_stats.thread_stat = calloc(nthreads, sizeof(thread_stat_t));
     if (! threads) 
 	{

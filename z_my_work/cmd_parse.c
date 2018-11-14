@@ -21,10 +21,19 @@
 #include "cmd_parse.h"
 
 
+void time_func(int fd, short flag, void * c)
+{
+	//printf("In time event\n");
+	eventbase_delete_time_event(c, (timeevent_handle)(((conn_t *)c)->user_data));
+	(((conn_t *)c)->user_data) = NULL;
+}
+
 char *ret_world = "world";
 parse_status_f hello_func(conn_t * c,char *_buf,int len)
 {
 	eventbase_add_write_data(c, ret_world,strlen(ret_world) );
+	if(c->user_data == NULL)
+		c->user_data =(void *) eventbase_add_time_event(c, 1000, time_func);
 
 	return (PARSE_NEED_WRITE | PARSE_DONE);
 }

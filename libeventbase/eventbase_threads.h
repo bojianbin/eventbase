@@ -30,6 +30,7 @@ extern "C"
 #define UDP_READ_BUFFER_SIZE 65536
 #define UDP_MAX_PAYLOAD_SIZE 1400
 
+#define TIMER_EVENT_NUM 2
 
 #ifndef IOV_MAX
 #define IOV_MAX 1024
@@ -131,7 +132,7 @@ typedef struct
     int notify_send_fd;         /* sending end of notify pipe */
     conn_queue_t *new_conn_queue; /* queue of new connections to handle */
 	thread_stat_t *stats;
-} EVENT_THREAD;
+} event_thread_t;
 
 typedef struct conn_s
 {
@@ -144,8 +145,8 @@ typedef struct conn_s
     struct event event;
 	/*event for write*/
 	struct event wevent;
-    short  ev_flags;
-    short  which;   /** which events were just triggered */
+	/*event for time*/
+	struct event *timeevent[TIMER_EVENT_NUM];
 
     char   *rbuf;   /** buffer to read commands into */
     char   *rcurr;  /** but if we parsed some already, this is where we stopped */
@@ -178,16 +179,36 @@ typedef struct conn_s
     socklen_t request_addr_size;
  
     struct conn_s   *next;     /* Used for generating a list of conn structures */
-    EVENT_THREAD *thread; /* Pointer to the thread object serving this connection */
+    event_thread_t *thread; /* Pointer to the thread object serving this connection */
 
+
+	/* a big probability situation is user need define more data to solve specific business*/
 	void *user_data;
 }conn_t;
 
+ /**
+ *  A callback function for an event.
+ * 
+ * @note: 
+ *		this is libevent callback,I just copy this without any modification.
+ *		but it's a little clumsy here.when you use eventbase_add_time_event() function to add event then
+ *		the only concern arg is the third one:data(here means conn_t *,the client structure)
+ *
+ * @param[in] fd	  	:fd An fd or signal
+ * @param[in] event	  	:events One or more EV_* flags
+ * @param[in] data	  	:user-supplied argument.
+ *
+ */
+typedef void (*_event_callback)(int, short, void *);
+typedef int timeevent_handle;
 
 int eventbase_get_stats(char *buf,int length);
 int eventbase_data_init(struct event_base * main_base);
 int eventbase_server_socket(int port,struct event_base *main_base);
 void eventbase_thread_init(int nthreads) ;
+
+timeevent_handle eventbase_add_time_event(conn_t *c, int millionseconds,_event_callback func);
+int eventbase_delete_time_event(conn_t *c,timeevent_handle _arg      );
 
 int eventbase_copy_write_data(conn_t *c , void *buf, int len);
 int eventbase_add_write_data(conn_t *c, const void *buf, int len); 

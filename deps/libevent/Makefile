@@ -6,7 +6,7 @@ TARGET_test=libevent_test
 OBJ_test = sample.o
 include $(TOP_DIR)/rules.mk
 BUILD_DIR=$(TOP_DIR)/build/
-EVENT_DIR=$(TOP_DIR)/libevent/$(TARGET)
+EVENT_DIR=$(TOP_DIR)/deps/libevent/$(TARGET)
 
 all:prepare compile  install test
 

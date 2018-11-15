@@ -315,7 +315,8 @@ static void conn_close(conn_t *c)
 		return;
 
     /* delete the event, the socket and the conn */
-    event_del(&c->event);
+    if(c->state != conn_drain)
+        event_del(&c->event);
 	if(c->wstate == conn_write || c->wstate == conn_mwrite)
 		event_del(&c->wevent);
 	/*clear time event*/
@@ -955,7 +956,16 @@ void drive_machine(conn_t *c)
 				}
 				if(parse_ret & PARSE_ERROR)
 				{
-					conn_set_state(c, conn_closing);
+                    if(parse_ret & PARSE_NEED_WRITE)
+                    {
+                        event_del(&c->event);
+					    conn_set_state(c, conn_drain);
+					    eventbase_add_wevent(c);
+                        stop = true;
+                    }else
+                    {
+					    conn_set_state(c, conn_closing);
+                    }
 					break;
 				}
 				if(c->rbytes >= c->rsize && parse_len == 0)
@@ -1027,7 +1037,13 @@ void write_machine(conn_t *c)
 				{
 					case TRANSMIT_COMPLETE:
 						eventbase_delete_wevent(c);
-						stop = true;
+                        if(c->state == conn_drain)
+                        {
+                            conn_set_wstate(c,conn_wclosing);
+                        }else
+                        {
+						    stop = true;
+                        }
 						break;
 
 					case TRANSMIT_INCOMPLETE:
@@ -1051,14 +1067,13 @@ void write_machine(conn_t *c)
 				{
 					case TRANSMIT_COMPLETE:
 						eventbase_delete_wevent(c);
-						/*
-						ret = conn_msg_reset(c);
-						if(ret < 0)
-						{
-							conn_set_wstate(c, conn_wclosing);
-							break;
-						}*/
-						stop = true;
+                        if(c->state == conn_drain)
+                        {
+                            conn_set_wstate(c,conn_wclosing);
+                        }else
+                        {
+						    stop = true;
+                        }
 						break;
 
 					case TRANSMIT_INCOMPLETE:

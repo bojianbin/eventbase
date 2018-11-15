@@ -61,6 +61,7 @@ typedef enum
     conn_listening,  /**< the socket which listens for connections */
     conn_read,       /**< reading in a command line */
     conn_parse_cmd,  /**< try to parse a command from the input buffer */
+    conn_drain,     /**< send data ,then close */
     conn_closing,    /**< closing this connection */
     conn_closed,     /**< connection is closed */
     conn_max_state   /**< Max state value (used for assertion) */

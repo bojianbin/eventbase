@@ -159,6 +159,9 @@ typedef struct conn_s
     int    wsize;
     int    wbytes;
 
+    void **mem_free;
+    int total_free_size;
+    int used_free_size;
 
     /* data for the mwrite state */
     struct iovec *iov;
@@ -212,7 +215,7 @@ timeevent_handle eventbase_add_time_event(conn_t *c, int millionseconds,_event_c
 int eventbase_delete_time_event(conn_t *c,timeevent_handle _arg      );
 
 int eventbase_copy_write_data(conn_t *c , void *buf, int len);
-int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
+int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free); 
 
 #ifdef __cplusplus
 }

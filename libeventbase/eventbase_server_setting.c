@@ -19,7 +19,11 @@ static key_value_t setting_parse[] =
 	{"COMMON","max_connections",	&g_setting.max_connections,		VALUE_INT,	
 		sizeof(g_setting.max_connections),"server max connections"},
 	{"DETAIL","max_user_rbuf",		&g_setting.max_user_rbuf,		VALUE_INT,	
-		sizeof(g_setting.max_user_rbuf),NULL}
+		sizeof(g_setting.max_user_rbuf),NULL},
+	{"DETAIL","user_wbuf",		&g_setting.user_wbuf,		VALUE_INT,	
+		sizeof(g_setting.user_wbuf),NULL},
+	{"DETAIL","socket_wbuf",		&g_setting.socket_wbuf,		VALUE_INT,	
+		sizeof(g_setting.socket_wbuf),NULL}
 };
 
 /**
@@ -42,6 +46,8 @@ void setting_init(server_setting_t *setting)
 	setting->server_port = 6737;
 
 	setting->max_user_rbuf = 5120;
+	setting->user_wbuf = 2048;
+	setting->socket_wbuf = 16384;
 	
 	return;
 }

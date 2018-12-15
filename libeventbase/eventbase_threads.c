@@ -218,7 +218,7 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
         c->msglist = 0;
 
         c->rsize = read_buffer_size;
-        c->wsize = DATA_BUFFER_SIZE;
+        c->wsize = g_setting.user_wbuf;
         c->iovsize = IOV_LIST_INITIAL;
         c->msgsize = MSG_LIST_INITIAL;
 
@@ -295,7 +295,32 @@ static void conn_set_wstate(conn_t *c, conn_wstates_e state)
         c->wstate = state;
     }
 }
+static void _mem_free(conn_t *c)
+{
+	int i = 0;
+	if(c == NULL)
+		return;
+	
+	for( i = 0 ; i < c->used_free_size ;i++)
+	{
+		if(c->mem_free[i])
+		{
+			free(c->mem_free[i]);
+			c->mem_free[i] = NULL;
+		}
+	}
+	c->used_free_size = 0;
 
+	return;
+}
+static void clean_mem_free(conn_t *c)
+{
+	_mem_free(c);
+	if(c->total_free_size)
+		free(c->mem_free);
+	c->total_free_size = 0;
+	return;
+}
 static void conn_cleanup(conn_t *c) 
 {
     if(c == NULL)
@@ -305,6 +330,7 @@ static void conn_cleanup(conn_t *c)
 	{
         conn_set_state(c, conn_read);
     }
+	clean_mem_free(c);
 }
 
 static void conn_close(conn_t *c) 
@@ -564,7 +590,7 @@ int eventbase_copy_write_data(conn_t *c , void *buf, int len)
  *
  * @return: 0 if success . -1 if error
  */
-int eventbase_add_write_data(conn_t *c, const void *buf, int len) 
+int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free) 
 {
 	int ret ;
     struct msghdr *m;
@@ -641,6 +667,24 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len)
 		
     }
 
+	if(need_free)
+	{
+		if(c->used_free_size >= c->total_free_size)
+		{
+			if(c->total_free_size == 0)
+			{
+				c->mem_free = (void **)calloc(c->total_free_size + 5 , sizeof(char *));
+			}else
+			{
+				c->mem_free = (void **)realloc(c->mem_free , (c->total_free_size + 5) * sizeof(char *) );
+			}
+			if(c->mem_free == NULL)
+				return -1;
+			c->total_free_size += 5;
+		}
+		c->mem_free[c->used_free_size] = (void *)buf;
+		c->used_free_size++;
+	}
 	//print_s("add",c);
     return 0;
 }
@@ -908,6 +952,7 @@ void drive_machine(conn_t *c)
 	            }
 	           	
 				anetNonBlock(NULL, sfd);
+				anetSndbuf(sfd,g_setting.socket_wbuf);
 
 	            if (sfd >= g_setting.max_connections - 1) 
 	           	{
@@ -1067,6 +1112,7 @@ void write_machine(conn_t *c)
 				{
 					case TRANSMIT_COMPLETE:
 						eventbase_delete_wevent(c);
+						_mem_free(c);
                         if(c->state == conn_drain)
                         {
                             conn_set_wstate(c,conn_wclosing);
@@ -1196,11 +1242,7 @@ static void thread_libevent_process(int fd, short which, void *arg)
 
 static void setup_thread(event_thread_t *me) 
 {
-    struct event_config *ev_config;
-    ev_config = event_config_new();
-    event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
-    me->base = event_base_new_with_config(ev_config);
-    event_config_free(ev_config);
+    me->base = event_base_new();
 
     if (! me->base) 
 	{

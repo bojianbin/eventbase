@@ -34,7 +34,8 @@ typedef struct
 	int max_connections;
 
 	int max_user_rbuf;
-	
+	int user_wbuf;
+	int socket_wbuf;
 }server_setting_t;
 
 extern server_setting_t g_setting;

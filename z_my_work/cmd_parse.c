@@ -31,7 +31,7 @@ void time_func(int fd, short flag, void * c)
 char *ret_world = "world";
 parse_status_f hello_func(conn_t * c,char *_buf,int len)
 {
-	eventbase_add_write_data(c, ret_world,strlen(ret_world) );
+	eventbase_add_write_data(c, ret_world,strlen(ret_world) ,0);
 	if(c->user_data == NULL)
 		c->user_data =(void *) eventbase_add_time_event(c, 1000, time_func);
 
@@ -62,12 +62,12 @@ parse_status_f string_func(conn_t * c,char *_buf,int len)
 
 	while(str_len / strlen(str_sore) >= 1)
 	{
-		eventbase_add_write_data(c, str_sore,strlen(str_sore) );
+		eventbase_add_write_data(c, str_sore,strlen(str_sore) ,0);
 		str_len -=  strlen(str_sore);
 	}
 	if(str_len > 0)
 	{
-		eventbase_add_write_data(c, str_sore,str_len );
+		eventbase_add_write_data(c, str_sore,str_len ,0);
 	}
 
 	return PARSE_DONE | PARSE_NEED_WRITE ;
@@ -111,7 +111,7 @@ void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
  * @note: 
  *		now may have three ways to write data to socket write buffer
  *     	1:int eventbase_copy_write_date(conn_t *c , void *buf, int len);
- *		2:int eventbase_add_write_data(conn_t *c, const void *buf, int len); 
+ *		2:int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free); 
  *		3:handle wbuf,wcurr,wsize,wbytes directly.this can reduce cpu load in some case
  *		
  *		1 and 3 belong to one send sequence system,which is different from 2.

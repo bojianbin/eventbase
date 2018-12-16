@@ -218,7 +218,7 @@ conn_t *conn_new(const int sfd, conn_states_e init_state,
         c->msglist = 0;
 
         c->rsize = read_buffer_size;
-        c->wsize = g_setting.user_wbuf;
+        c->wsize = g_setting.user_copy_wbuf;
         c->iovsize = IOV_LIST_INITIAL;
         c->msgsize = MSG_LIST_INITIAL;
 
@@ -343,7 +343,7 @@ static void conn_close(conn_t *c)
     /* delete the event, the socket and the conn */
     if(c->state != conn_drain)
         event_del(&c->event);
-	if(c->wstate == conn_write || c->wstate == conn_mwrite)
+	if(c->wstate == conn_mwrite)
 		event_del(&c->wevent);
 	/*clear time event*/
 	for(i = 0 ; i < TIMER_EVENT_NUM ; i++)
@@ -547,6 +547,7 @@ int  conn_msg_reset(conn_t *c)
 	
 }
 
+int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free) ;
 /**
  * copy data to user write buffer 
  * 
@@ -561,6 +562,7 @@ int  conn_msg_reset(conn_t *c)
  */
 int eventbase_copy_write_data(conn_t *c , void *buf, int len)
 {
+	int ret ;
 	if(!c || !buf || len <= 0 || len > c->wsize - c->wbytes)
 		return -1;
 
@@ -568,15 +570,50 @@ int eventbase_copy_write_data(conn_t *c , void *buf, int len)
 	if( re_pos + len > c->wsize)
 	{
 		memmove( c->wbuf + re_pos,buf,c->wsize - re_pos);
+		ret = eventbase_add_write_data(c,c->wbuf + re_pos, c->wsize - re_pos,0) ;
+		if(ret < 0)
+			goto FAIL;
+
 		memmove(c->wbuf,buf + c->wsize - re_pos ,len - (c->wsize - re_pos) );
+		ret = eventbase_add_write_data(c,c->wbuf, len - (c->wsize - re_pos),0) ;
+		if(ret < 0)
+			goto FAIL;
 		
 	}else
 	{
 		memmove( c->wbuf + re_pos,buf,len);
+		ret = eventbase_add_write_data(c,c->wbuf + re_pos, len,0) ;
+		if(ret < 0)
+			goto FAIL;
 	}
-	
-	c->wbytes += len;	
-	
+	c->wbytes += len;
+	return 0;
+
+FAIL:
+	c->wbytes += len;
+	return -1;	
+}
+int cal_mdata_len(conn_t * c)
+{
+	int len = 0 , i = 0;
+	int used = c->msgused;
+	int cur = c->msgcurr;
+
+	if (c->msgused > 0 && c->msglist[cur].msg_iovlen > 0) 
+	{
+		while(used)
+		{
+			for(i = 0 ; i < c->msglist[cur].msg_iovlen ; i++)
+			{
+				len += c->msglist[cur].msg_iov[i].iov_len;
+			}
+			cur = ( ++cur) % c->msgsize ;
+			used--;
+		}
+	}else
+		return 0;
+
+	return len;
 }
 /**
  * add data to user write buffer 
@@ -587,6 +624,7 @@ int eventbase_copy_write_data(conn_t *c , void *buf, int len)
  * @param[in] c	  		:client structure
  * @param[in] buf	  	:data buffer addr
  * @param[in] len	  	:data length
+ * @param[in] need_free	:buf need free after send out
  *
  * @return: 0 if success . -1 if error
  */
@@ -603,6 +641,11 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free)
 		return -1;
 	if(c->iovused >= c->iovsize)
 		return -1;
+	
+	if(cal_mdata_len(c) + len > g_setting.max_data_sending)
+	{
+		return -1;
+	}
 	
     if (c->transport == udp_transport) 
 	{
@@ -790,6 +833,16 @@ transmit_result_e try_send_data(conn_t *c)
 
 	return TRANSMIT_COMPLETE;
 }
+void _release_space_wbuf_if_any(conn_t * c,char *buf ,int len)
+{
+	if(buf && len > 0 && buf >= c->wbuf && buf < c->wbuf + g_setting.user_copy_wbuf)
+	{
+		c->wcurr = c->wbuf + (c->wcurr - c->wbuf + len) % c->wsize ;
+		c->wbytes -= len ;
+	}
+
+	return;
+}
 
 transmit_result_e try_send_mdata(conn_t *c) 
 {
@@ -814,6 +867,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 	               iovec entries from the list of pending writes. */
 	            while (m->msg_iovlen > 0 && res >= m->msg_iov->iov_len) 
 				{
+					_release_space_wbuf_if_any(c,m->msg_iov->iov_base,m->msg_iov->iov_len);
 	                res -= m->msg_iov->iov_len;
 	                m->msg_iovlen--;
 	                m->msg_iov++;
@@ -827,6 +881,7 @@ transmit_result_e try_send_mdata(conn_t *c)
 	               adjust it so the next write will do the rest. */
 	            if (res > 0) 
 				{
+					_release_space_wbuf_if_any(c,(caddr_t)m->msg_iov->iov_base,res);
 	                m->msg_iov->iov_base = (caddr_t)m->msg_iov->iov_base + res;
 	                m->msg_iov->iov_len -= res;
 					return TRANSMIT_INCOMPLETE;
@@ -866,11 +921,10 @@ transmit_result_e try_send_mdata(conn_t *c)
 
 void eventbase_add_wevent(conn_t *c)
 {
-	if(c->wstate == conn_write || c->wstate == conn_mwrite)
+	if(c->wstate == conn_mwrite)
 		return;
-	if(c->wbytes != 0)
-		c->wstate = conn_write;
-	else if(c->msglist[c->msgcurr].msg_iovlen > 0)
+
+	if(c->msglist[c->msgcurr].msg_iovlen > 0)
 		c->wstate = conn_mwrite;
 	else
 		return;
@@ -881,27 +935,13 @@ void eventbase_add_wevent(conn_t *c)
 }
 void eventbase_delete_wevent(conn_t *c)
 {
-	if(c->wstate != conn_write && c->wstate != conn_mwrite)
+	if(c->wstate != conn_mwrite)
 		return;
 	
 	
 	switch(c->wstate)
 	{
-		case conn_write:
-			if(c->msglist[c->msgcurr].msg_iovlen > 0)
-			{
-				c->wstate = conn_mwrite;
-				return;
-			}
-			c->wstate = conn_nowrite;
-			event_del(&c->wevent);
-			break;
 		case conn_mwrite:
-			if(c->wbytes != 0)
-			{
-				c->wstate = conn_write;
-				return;
-			}
 			c->wstate = conn_nowrite;
 			event_del(&c->wevent);
 			break;
@@ -1075,7 +1115,7 @@ void write_machine(conn_t *c)
 	while(stop == false)
 	{
 		switch(c->wstate)
-		{
+		{/*
 			case conn_write:
 				c->last_cmd_time = current_time;
 				switch (try_send_data(c)) 
@@ -1103,7 +1143,7 @@ void write_machine(conn_t *c)
 							conn_set_wstate(c, conn_wclosing);
 						}
 				}
-				break;
+				break;*/
 				
 			case conn_mwrite:
 				
@@ -1123,8 +1163,9 @@ void write_machine(conn_t *c)
 						break;
 
 					case TRANSMIT_INCOMPLETE:
-						stop = true;
-						break;
+							stop = true;
+							break;
+						
 					case TRANSMIT_ERROR:
 						if(c->transport == udp_transport)
 						{

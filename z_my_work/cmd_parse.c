@@ -31,7 +31,10 @@ void time_func(int fd, short flag, void * c)
 char *ret_world = "world";
 parse_status_f hello_func(conn_t * c,char *_buf,int len)
 {
-	eventbase_add_write_data(c, ret_world,strlen(ret_world) ,0);
+	int ret ;
+	ret = eventbase_add_write_data(c, ret_world,strlen(ret_world) ,0);
+	if(ret < 0)
+		return (PARSE_DONE | PARSE_ERROR);
 	if(c->user_data == NULL)
 		c->user_data =(void *) eventbase_add_time_event(c, 1000, time_func);
 
@@ -39,12 +42,16 @@ parse_status_f hello_func(conn_t * c,char *_buf,int len)
 }
 parse_status_f stat_func(conn_t * c,char *_buf,int len)
 {
+	int ret;
 	char *buf  = (char *)calloc(1,2048);
 
 	eventbase_get_stats(buf, 2048);
-	eventbase_copy_write_data(c,buf,strlen(buf));
+	ret = eventbase_copy_write_data(c,buf,strlen(buf));
 
 	free(buf);
+	if(ret < 0)
+		return PARSE_DONE | PARSE_ERROR;
+
 	return (PARSE_NEED_WRITE | PARSE_DONE);
 }
 parse_status_f string_func(conn_t * c,char *_buf,int len)
@@ -62,12 +69,16 @@ parse_status_f string_func(conn_t * c,char *_buf,int len)
 
 	while(str_len / strlen(str_sore) >= 1)
 	{
-		eventbase_add_write_data(c, str_sore,strlen(str_sore) ,0);
+		ret = eventbase_add_write_data(c, str_sore,strlen(str_sore) ,0);
+		if(ret < 0)
+			return PARSE_ERROR;
 		str_len -=  strlen(str_sore);
 	}
 	if(str_len > 0)
 	{
-		eventbase_add_write_data(c, str_sore,str_len ,0);
+		ret = eventbase_add_write_data(c, str_sore,str_len ,0);
+		if(ret < 0)
+			return PARSE_ERROR;
 	}
 
 	return PARSE_DONE | PARSE_NEED_WRITE ;

@@ -33,9 +33,11 @@ typedef struct
 	int server_port;
 	int max_connections;
 
-	int max_user_rbuf;
-	int user_wbuf;
-	int socket_wbuf;
+	int max_user_rbuf;			/*user read buffer size*/
+	int user_copy_wbuf; 		/*copy buffer size*/
+	int socket_wbuf;    		/*SO_SNDBUF option*/
+	int max_data_sending;   	/*max size of the data to send*/
+	int max_mute_time;
 }server_setting_t;
 
 extern server_setting_t g_setting;

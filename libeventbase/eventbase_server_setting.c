@@ -20,10 +20,14 @@ static key_value_t setting_parse[] =
 		sizeof(g_setting.max_connections),"server max connections"},
 	{"DETAIL","max_user_rbuf",		&g_setting.max_user_rbuf,		VALUE_INT,	
 		sizeof(g_setting.max_user_rbuf),NULL},
-	{"DETAIL","user_wbuf",		&g_setting.user_wbuf,		VALUE_INT,	
-		sizeof(g_setting.user_wbuf),NULL},
+	{"DETAIL","user_copy_wbuf",		&g_setting.user_copy_wbuf,		VALUE_INT,	
+		sizeof(g_setting.user_copy_wbuf),NULL},
 	{"DETAIL","socket_wbuf",		&g_setting.socket_wbuf,		VALUE_INT,	
-		sizeof(g_setting.socket_wbuf),NULL}
+		sizeof(g_setting.socket_wbuf),NULL},
+	{"DETAIL","user_data_sending",		&g_setting.max_data_sending,		VALUE_INT,	
+		sizeof(g_setting.max_data_sending),"max size of the data to send"},
+	{"DETAIL","max_mute_time",		&g_setting.max_mute_time,		VALUE_INT,	
+		sizeof(g_setting.max_mute_time),NULL}
 };
 
 /**
@@ -46,8 +50,10 @@ void setting_init(server_setting_t *setting)
 	setting->server_port = 6737;
 
 	setting->max_user_rbuf = 5120;
-	setting->user_wbuf = 2048;
+	setting->user_copy_wbuf = 2048;
 	setting->socket_wbuf = 16384;
+	setting->max_data_sending = setting->socket_wbuf + setting->user_copy_wbuf + 20480;
+	setting->max_mute_time = 60;//seconds
 	
 	return;
 }

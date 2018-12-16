@@ -124,15 +124,18 @@ typedef struct
 	thread_stat_t *thread_stat;
 }server_stat_t;
 
+struct conn_s;
 typedef struct 
 {
     pthread_t thread_id;        /* unique ID of this thread */
     struct event_base *base;    /* libevent handle this thread uses */
     struct event notify_event;  /* listen event for notify pipe */
+    struct event live_event;
     int notify_receive_fd;      /* receiving end of notify pipe */
     int notify_send_fd;         /* sending end of notify pipe */
     conn_queue_t *new_conn_queue; /* queue of new connections to handle */
 	thread_stat_t *stats;
+    struct conn_s *conn_list;
 } event_thread_t;
 
 typedef struct conn_s
@@ -183,6 +186,7 @@ typedef struct conn_s
     socklen_t request_addr_size;
  
     struct conn_s   *next;     /* Used for generating a list of conn structures */
+    struct conn_s   *pre;
     event_thread_t *thread; /* Pointer to the thread object serving this connection */
 
 

@@ -32,6 +32,32 @@ static struct event clockevent;
 
 
 
+static void add_thread_conn(event_thread_t * thread,conn_t * c)
+{
+	if(thread->conn_list == NULL)
+	{
+		thread->conn_list = c;
+		c->next = NULL;
+		c->pre = NULL;
+	}else
+	{
+		thread->conn_list->pre = c;
+		c->next = thread->conn_list;
+		c->pre = NULL;
+		thread->conn_list = c;
+	}
+}
+static void remove_thread_conn(event_thread_t * thread,conn_t * c)
+{
+	if(thread->conn_list == c)
+	{
+		thread->conn_list = c->next;
+	}else{
+		c->pre->next = c->next;
+		if(c->next)
+			c->next->pre = c->pre; 
+	}
+}
 /*
  * Initializes a connection queue.
  */
@@ -363,6 +389,7 @@ static void conn_close(conn_t *c)
     conn_set_state(c, conn_closed);
 	conn_set_wstate(c, conn_wclosed);
     close(c->sfd);
+	remove_thread_conn(c->thread,c);
 
     return;
 }
@@ -1229,7 +1256,26 @@ void event_handler(const int fd, const short which, void *arg)
     return;
 }
 
+static void thread_live_process(int fd, short which, void *arg) 
+{
+	event_thread_t *me = arg;
+	int count = 0;
+	conn_t * next;
+	conn_t * c ;
 
+	for(c = me->conn_list ; c  ;)
+	{
+		next = c->next;
+
+		if(current_time - c->last_cmd_time > g_setting.max_mute_time)
+		{
+			conn_close(c);
+		}
+		c = next;
+	}
+
+	return;
+}
 /*
  * Processes an incoming "handle a new connection" item. This is called when
  * input arrives on the libevent wakeup pipe.
@@ -1271,6 +1317,7 @@ static void thread_libevent_process(int fd, short which, void *arg)
 		        } else 
 		       	{
 		            c->thread = me;
+					add_thread_conn(me,c);
 					c->thread->stats->total_clients++;
 					c->thread->stats->curr_clients++;
 		        }
@@ -1284,6 +1331,7 @@ static void thread_libevent_process(int fd, short which, void *arg)
 static void setup_thread(event_thread_t *me) 
 {
     me->base = event_base_new();
+	struct timeval _sec={.tv_sec=60,.tv_usec=0};
 
     if (! me->base) 
 	{
@@ -1293,12 +1341,22 @@ static void setup_thread(event_thread_t *me)
 
     /* Listen for notifications from other threads */
     event_assign(&me->notify_event,me->base, me->notify_receive_fd,EV_READ | EV_PERSIST, thread_libevent_process, me);
+	
 
     if (event_add(&me->notify_event, NULL) == -1) 
 	{
         fprintf(stderr, "Can't monitor libevent notify pipe\n");
         exit(1);
     }
+	if(g_setting.max_mute_time > 0)
+	{
+		event_assign(&me->live_event,me->base, -1,EV_PERSIST, thread_live_process, me);
+		if (event_add(&me->live_event, &_sec) == -1) 
+		{
+			fprintf(stderr, "Can't monitor libevent live event\n");
+			exit(1);
+		}
+	}
 
     me->new_conn_queue = malloc(sizeof(conn_queue_t));
     if (me->new_conn_queue == NULL) 

@@ -27,7 +27,7 @@ static key_value_t setting_parse[] =
 	{"DETAIL","user_data_sending",		&g_setting.max_data_sending,		VALUE_INT,	
 		sizeof(g_setting.max_data_sending),"max size of the data to send"},
 	{"DETAIL","max_mute_time",		&g_setting.max_mute_time,		VALUE_INT,	
-		sizeof(g_setting.max_mute_time),NULL}
+		sizeof(g_setting.max_mute_time),"max socket time without any interaction,in secondes,0 if no limit"}
 };
 
 /**
@@ -53,7 +53,7 @@ void setting_init(server_setting_t *setting)
 	setting->user_copy_wbuf = 2048;
 	setting->socket_wbuf = 16384;
 	setting->max_data_sending = setting->socket_wbuf + setting->user_copy_wbuf + 20480;
-	setting->max_mute_time = 60;//seconds
+	setting->max_mute_time = 0;//seconds
 	
 	return;
 }

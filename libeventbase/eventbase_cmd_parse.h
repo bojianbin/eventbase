@@ -17,9 +17,8 @@ extern "C"
 
 
 /*data parse result. flag set*/
-#define PARSE_DONE 1
-#define PARSE_NEED_WRITE (1<<1)
-#define PARSE_ERROR (1<<2)
+#define PARSE_DONE 0
+#define PARSE_ERROR (1)
 typedef int parse_status_f;
 
 /**
@@ -41,8 +40,6 @@ typedef int parse_status_f;
  * @return:
  *			PARSE_DONE: 
  				we just parse.no need to write.@parsed_len give length we pass through.
- *			PARSE_NEED_WRITE:
- 				we just parse.need to write.@parsed_len give length we pass through.
  *			PARSE_ERROR:
  				some fatal error occurs,need to close this client.
  */

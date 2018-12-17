@@ -50,7 +50,7 @@ void setting_init(server_setting_t *setting)
 	setting->server_port = 6737;
 
 	setting->max_user_rbuf = 5120;
-	setting->user_copy_wbuf = 2048;
+	setting->user_copy_wbuf = 4096;
 	setting->socket_wbuf = 16384;
 	setting->max_data_sending = 51200;
 	setting->max_mute_time = 0;//seconds

@@ -644,6 +644,8 @@ int cal_mdata_len(conn_t * c)
 
 	return len;
 }
+
+void eventbase_add_wevent(conn_t *c);
 /**
  * add data to user write buffer 
  * 
@@ -759,6 +761,7 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free)
 		c->mem_free[c->used_free_size] = (void *)buf;
 		c->used_free_size++;
 	}
+	eventbase_add_wevent(c);
 	//print_s("add",c);
     return 0;
 }
@@ -1073,7 +1076,7 @@ void drive_machine(conn_t *c)
 				}
 				if(parse_ret & PARSE_ERROR)
 				{
-                    if(parse_ret & PARSE_NEED_WRITE)
+					if(c->wstate == conn_mwrite)
                     {
                         event_del(&c->event);
 					    conn_set_state(c, conn_drain);
@@ -1090,9 +1093,8 @@ void drive_machine(conn_t *c)
 					conn_set_state(c, conn_closing);
 					break;
 				}
-				if(parse_ret & PARSE_NEED_WRITE)
-					eventbase_add_wevent(c);
-				if(parse_ret & PARSE_DONE)
+				/*no need PARSE_DONE,this can save from unnecessary errors*/
+				//if(parse_ret & PARSE_DONE)
 				{
 					conn_set_state(c, conn_read);
 					/*no data in user read buffer*/

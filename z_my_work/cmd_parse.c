@@ -34,11 +34,11 @@ parse_status_f hello_func(conn_t * c,char *_buf,int len)
 	int ret ;
 	ret = eventbase_add_write_data(c, ret_world,strlen(ret_world) ,0);
 	if(ret < 0)
-		return (PARSE_DONE | PARSE_ERROR);
+		return (PARSE_ERROR);
 	if(c->user_data == NULL)
 		c->user_data =(void *) eventbase_add_time_event(c, 1000, time_func);
 
-	return (PARSE_NEED_WRITE | PARSE_DONE);
+	return (PARSE_DONE);
 }
 parse_status_f stat_func(conn_t * c,char *_buf,int len)
 {
@@ -50,9 +50,9 @@ parse_status_f stat_func(conn_t * c,char *_buf,int len)
 
 	free(buf);
 	if(ret < 0)
-		return PARSE_DONE | PARSE_ERROR;
+		return PARSE_ERROR;
 
-	return (PARSE_NEED_WRITE | PARSE_DONE);
+	return PARSE_DONE;
 }
 parse_status_f string_func(conn_t * c,char *_buf,int len)
 {
@@ -81,7 +81,7 @@ parse_status_f string_func(conn_t * c,char *_buf,int len)
 			return PARSE_ERROR;
 	}
 
-	return PARSE_DONE | PARSE_NEED_WRITE ;
+	return PARSE_DONE ;
 	
 }
 
@@ -134,8 +134,6 @@ void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
  * @return:
  *			PARSE_DONE: 
  				we just parse.no need to write.@parsed_len give length we pass through.
- *			PARSE_NEED_WRITE:
- 				we just parse.need to write.@parsed_len give length we pass through.
  *			PARSE_ERROR:
  				some fatal error occurs,need to close this client.
  */

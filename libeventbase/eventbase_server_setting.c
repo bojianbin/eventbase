@@ -23,11 +23,11 @@ static key_value_t setting_parse[] =
 	{"DETAIL","user_copy_wbuf",		&g_setting.user_copy_wbuf,		VALUE_INT,	
 		sizeof(g_setting.user_copy_wbuf),NULL},
 	{"DETAIL","socket_wbuf",		&g_setting.socket_wbuf,		VALUE_INT,	
-		sizeof(g_setting.socket_wbuf),NULL},
-	{"DETAIL","user_data_sending",		&g_setting.max_data_sending,		VALUE_INT,	
-		sizeof(g_setting.max_data_sending),"max size of the data to send"},
+		sizeof(g_setting.socket_wbuf),"SO_SNDBUF option"},
+	{"DETAIL","user_wdata_pending",		&g_setting.max_data_sending,		VALUE_INT,	
+		sizeof(g_setting.max_data_sending),"max size of the data pending to send,0 if no limit"},
 	{"DETAIL","max_mute_time",		&g_setting.max_mute_time,		VALUE_INT,	
-		sizeof(g_setting.max_mute_time),"max socket time without any interaction,in secondes,0 if no limit"}
+		sizeof(g_setting.max_mute_time),"max no-interaction socket time,in seconds,0 if no limit"}
 };
 
 /**
@@ -52,7 +52,7 @@ void setting_init(server_setting_t *setting)
 	setting->max_user_rbuf = 5120;
 	setting->user_copy_wbuf = 2048;
 	setting->socket_wbuf = 16384;
-	setting->max_data_sending = setting->socket_wbuf + setting->user_copy_wbuf + 20480;
+	setting->max_data_sending = 51200;
 	setting->max_mute_time = 0;//seconds
 	
 	return;

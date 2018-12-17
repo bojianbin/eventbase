@@ -69,7 +69,6 @@ typedef enum
 typedef enum
 {
 	conn_nowrite,
-    //conn_write,      /**< writing out a simple response */
 	conn_mwrite,     /**< writing out many items sequentially */
     conn_wclosing,    /**< closing this connection */
     conn_wclosed

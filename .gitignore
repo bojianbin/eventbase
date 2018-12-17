@@ -1,0 +1,5 @@
+*.o
+*.a
+*.so
+Untitled Project.si4project/
+build/

@@ -36,8 +36,8 @@ typedef struct
 	int max_user_rbuf;			/*user read buffer size*/
 	int user_copy_wbuf; 		/*copy buffer size*/
 	int socket_wbuf;    		/*SO_SNDBUF option*/
-	int max_data_sending;   	/*max size of the data to send*/
-	int max_mute_time;
+	int max_data_sending;   	/*max size of the data to send,0 if no limit*/
+	int max_mute_time;          /*max no-interaction socket time,0 if no limit,in seconds*/
 }server_setting_t;
 
 extern server_setting_t g_setting;

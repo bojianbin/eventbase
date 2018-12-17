@@ -638,7 +638,9 @@ int cal_mdata_len(conn_t * c)
 			used--;
 		}
 	}else
+	{
 		return 0;
+	}
 
 	return len;
 }
@@ -668,10 +670,12 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free)
 		return -1;
 	if(c->iovused >= c->iovsize)
 		return -1;
-	
-	if(cal_mdata_len(c) + len > g_setting.max_data_sending)
+	if(g_setting.max_data_sending > 0)
 	{
-		return -1;
+		if(cal_mdata_len(c) + len > g_setting.max_data_sending)
+		{
+			return -1;
+		}
 	}
 	
     if (c->transport == udp_transport) 
@@ -759,6 +763,7 @@ int eventbase_add_write_data(conn_t *c, const void *buf, int len,int need_free)
     return 0;
 }
 
+/*Deprecated*/
 transmit_result_e try_send_data(conn_t *c) 
 {
 	int ret = 0;
@@ -1142,36 +1147,7 @@ void write_machine(conn_t *c)
 	while(stop == false)
 	{
 		switch(c->wstate)
-		{/*
-			case conn_write:
-				c->last_cmd_time = current_time;
-				switch (try_send_data(c)) 
-				{
-					case TRANSMIT_COMPLETE:
-						eventbase_delete_wevent(c);
-                        if(c->state == conn_drain)
-                        {
-                            conn_set_wstate(c,conn_wclosing);
-                        }else
-                        {
-						    stop = true;
-                        }
-						break;
-
-					case TRANSMIT_INCOMPLETE:
-						stop = true;
-						break;
-					case TRANSMIT_ERROR:
-						if(c->transport == udp_transport)
-						{
-							eventbase_delete_wevent(c);
-						}else
-						{
-							conn_set_wstate(c, conn_wclosing);
-						}
-				}
-				break;*/
-				
+		{			
 			case conn_mwrite:
 				
 				c->last_cmd_time = current_time;
@@ -1317,7 +1293,8 @@ static void thread_libevent_process(int fd, short which, void *arg)
 		        } else 
 		       	{
 		            c->thread = me;
-					add_thread_conn(me,c);
+					if(item->transport != udp_transport)
+						add_thread_conn(me,c);
 					c->thread->stats->total_clients++;
 					c->thread->stats->curr_clients++;
 		        }

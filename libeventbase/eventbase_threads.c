@@ -891,6 +891,12 @@ transmit_result_e try_send_mdata(conn_t *c)
 	        ssize_t res;
 	        struct msghdr *m = &c->msglist[c->msgcurr];
 
+			c->msgbytes = 0;
+			for(i = 0 ; i < c->msglist[c->msgcurr].msg_iovlen ; i++)
+			{
+				c->msgbytes += c->msglist[c->msgcurr].msg_iov[i].iov_len;
+
+			}
 			in_send_mdata = 1;
 	        res = sendmsg(c->sfd, m, 0);
 			
@@ -925,10 +931,13 @@ transmit_result_e try_send_mdata(conn_t *c)
 				c->msgused--;
 				//print_s("after sendmsg", c);
 				c->msgbytes = 0;
-				for(i = 0 ; i < c->msglist[c->msgcurr].msg_iovlen ; i++)
+				//server_log(LOG_ERROR, "step6\n");
+				/*for(i = 0 ; i < c->msglist[c->msgcurr].msg_iovlen ; i++)
 				{
 					c->msgbytes += c->msglist[c->msgcurr].msg_iov[i].iov_len;
-				}
+
+				}*/
+				//server_log(LOG_ERROR, "step7\n");
 				continue;
 	        }
 	        if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) 
@@ -991,10 +1000,10 @@ void drive_machine(conn_t *c)
 	int stop = false;
 	int sfd;
 	int parse_len = 0;
-	socklen_t addrlen;
 	read_status_e read_ret;
 	parse_status_f parse_ret ;
     struct sockaddr_storage addr;
+	socklen_t addrlen = sizeof(addr);
 	
 	if(c == NULL)
 		return;

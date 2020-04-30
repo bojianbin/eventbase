@@ -1,2 +1,2 @@
 # eventbase
-a simple event-driven network framework for linux server
+a simple event-driven net framework for linux server
